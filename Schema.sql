@@ -12,7 +12,7 @@ CREATE INDEX idx_user_username ON "User"(username);
 
 
 -- 2. Create the Match table
-CREATE TABLE Match (
+CREATE TABLE "Match" (
     match_id BIGSERIAL PRIMARY KEY,
     started_at TIMESTAMP NOT NULL,
     ended_at TIMESTAMP,
@@ -41,7 +41,7 @@ CREATE TABLE Match (
 
 
 -- 3. Create the MatchParticipant table
-CREATE TABLE MatchParticipant (
+CREATE TABLE "MatchParticipant" (
     match_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
     role VARCHAR(12) DEFAULT 'player',
