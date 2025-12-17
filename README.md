@@ -6,6 +6,7 @@ A Gunny-like game for the Network Programming course.
 2. Database: PostgreSQL version 18.1
 
 ## Program Files Structure
+```
 src/
 ├── common/                 
 │   ├── network/
@@ -54,4 +55,5 @@ src/
     │   ├── Player.h         
     │   └── PhysicsEngine.h  
     └── map/
-        └── MapLoader.h     
+        └── MapLoader.h
+```   
