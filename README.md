@@ -38,18 +38,18 @@ src/
 ├── server_service/         
 │   ├── main.cpp
 │   ├── core/
-│   │   └── ServiceCore.h    
+│   │   └── ServiceServer.h    
 │   ├── database/
-│   │   ├── DatabaseManager.h 
+│   │   ├── DatabaseServer.h 
 │   │   └── UserDAO.h       
 │   └── logic/
-│       ├── AuthManager.h   
-│       └── MatchMaker.h     
+│       ├── AuthServer.h   
+│       └── MatchMakerServer.h     
 │
 └── server_ingame/        
     ├── main.cpp
     ├── core/
-    │   └── GameServerCore.h
+    │   └── GameServer.h
     ├── logic/
     │   ├── GameRoom.h      
     │   ├── Player.h         
