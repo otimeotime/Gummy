@@ -106,5 +106,21 @@ namespace PacketUtils {
         return str;
     }
     //--------------------------------------------------------------------------------------------------------------
+    // Facade Pattern for Sending Packets --------------------------------------------------------------------------
+    template <typename T>
+    bool SendPacket(TCPSocket* socket, PacketType type, const T& payloadStruct) {
+        Packet packet(type);
+        packet.SetPayload(payloadStruct);
+        std::vector<char> buffer;
+        PacketUtils::SerializePacket(packet, buffer);
+        return socket->Send(buffer.data(), buffer.size());
+    }
+
+    bool SendPacket(TCPSocket* socket, PacketType type) {
+        Packet packet(type);
+        std::vector<char> buffer;
+        PacketUtils::SerializePacket(packet, buffer);
+        return socket->Send(buffer.data(), buffer.size());
+    }
 
 }
