@@ -83,7 +83,7 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
                         res.isSuccess = false;
                         std::snprintf(res.message, sizeof(res.message), "Login failed. Invalid credentials.");     
                     }
-                    SendPacket(clientSocket, PacketType::RES_AUTHENTICATE, res);
+                    PacketUtils::SendPacket(clientSocket, PacketType::RES_AUTHENTICATE, res);
                 } else {
                     long outUserId;
                     if (mAuthServer.reg(req.username, req.password, outUserId)) {
@@ -96,7 +96,7 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
                         std::snprintf(res.message, sizeof(res.message), "Registration failed.");
                     }
                 }
-                SendPacket(clientSocket, PacketType::RES_AUTHENTICATE, res);
+                PacketUtils::SendPacket(clientSocket, PacketType::RES_AUTHENTICATE, res);
             }
             break;
             // -------------------------------------------------------------------------------------------------------------------------------------------
@@ -119,7 +119,7 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
                     res.isSuccess = false;
                     std::snprintf(res.message, sizeof(res.message), "Password change failed.");
                 }
-                SendPacket(clientSocket, PacketType::RES_CHANGE_PASSWORD, res);
+                PacketUtils::SendPacket(clientSocket, PacketType::RES_CHANGE_PASSWORD, res);
             }
             break;
             // -------------------------------------------------------------------------------------------------------------------------------------------
