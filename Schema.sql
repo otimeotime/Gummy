@@ -7,9 +7,21 @@ CREATE TABLE "User" (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+ALTER TABLE "User" 
+ADD COLUMN elo INT DEFAULT 300;
+
+CREATE TABLE "Friend" (
+	user_id1 BIGSERIAL NOT NULL,
+	user_id2 BIGSERIAL NOT NULL, 
+	added_time TIMESTAMP DEFAULT NOW(),
+	CONSTRAINT pk_friend PRIMARY KEY (user_id1, user_id2),
+	CONSTRAINT fk_user_id1 FOREIGN KEY (user_id1) REFERENCES "User"(user_id) ON DELETE CASCADE,
+	CONSTRAINT fk_user_id2 FOREIGN KEY (user_id2) REFERENCES "User"(user_id) ON DELETE CASCADE,
+	CONSTRAINT check_order CHECK (user_id1 != user_id2)
+);
+
 -- Create the specific index for username as requested
 CREATE INDEX idx_user_username ON "User"(username);
-
 
 -- 2. Create the Match table
 CREATE TABLE "Match" (
@@ -44,7 +56,7 @@ CREATE TABLE "Match" (
 CREATE TABLE "MatchParticipant" (
     match_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
-    role VARCHAR(12) DEFAULT 'player',
+	is_player BOOLEAN NOT NULL,
     team SMALLINT,
     turn_order SMALLINT,
     score INT DEFAULT 0,
@@ -55,14 +67,10 @@ CREATE TABLE "MatchParticipant" (
     -- Foreign Keys
     CONSTRAINT fk_participant_match
         FOREIGN KEY (match_id)
-        REFERENCES Match(match_id)
+        REFERENCES "Match"(match_id)
         ON DELETE CASCADE,
 
     CONSTRAINT fk_participant_user
         FOREIGN KEY (user_id)
-        REFERENCES "User"(user_id),
-
-    -- Optional: Limit role to specific values
-    CONSTRAINT chk_participant_role
-        CHECK (role IN ('player', 'bot'))
+        REFERENCES "User"(user_id)
 );

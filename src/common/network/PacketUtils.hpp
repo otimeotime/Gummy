@@ -2,6 +2,7 @@
 #define PACKET_UTILS_HPP
 
 #include "Packet.hpp"
+#include "TCPSocket.hpp"
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -21,5 +22,21 @@ namespace PacketUtils {
     float ReadFloat(const std::vector<char>& buffer, size_t& offset);
     bool ReadBool(const std::vector<char>& buffer, size_t& offset);
 };
+
+template <typename T>
+bool SendPacket(TCPSocket* socket, PacketType type, const T& payloadStruct) {
+    Packet packet(type);
+    packet.SetPayload(payloadStruct);
+    std::vector<char> buffer;
+    PacketUtils::SerializePacket(packet, buffer);
+    return socket->Send(buffer.data(), buffer.size());
+}
+
+bool SendPacket(TCPSocket* socket, PacketType type) {
+    Packet packet(type);
+    std::vector<char> buffer;
+    PacketUtils::SerializePacket(packet, buffer);
+    return socket->Send(buffer.data(), buffer.size());
+}
 
 #endif // PACKET_UTILS_HPP
