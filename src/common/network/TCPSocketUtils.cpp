@@ -107,20 +107,46 @@ namespace PacketUtils {
     }
     //--------------------------------------------------------------------------------------------------------------
     // Facade Pattern for Sending Packets --------------------------------------------------------------------------
-    template <typename T>
-    bool SendPacket(TCPSocket* socket, PacketType type, const T& payloadStruct) {
-        Packet packet(type);
-        packet.SetPayload(payloadStruct);
-        std::vector<char> buffer;
-        PacketUtils::SerializePacket(packet, buffer);
-        return socket->Send(buffer.data(), buffer.size());
-    }
+    // Template implementations moved to PacketUtils.hpp
 
     bool SendPacket(TCPSocket* socket, PacketType type) {
         Packet packet(type);
         std::vector<char> buffer;
         PacketUtils::SerializePacket(packet, buffer);
         return socket->Send(buffer.data(), buffer.size());
+    }
+
+    bool ReceivePacket(TCPSocket* socket, Packet& outPacket) {
+        if (!socket || !socket->IsValid()) return false;
+        std::vector<char> headerBuffer(sizeof(Header));
+        
+        int bytesRead = socket->Receive(headerBuffer.data(), headerBuffer.size());
+        
+        if (bytesRead < static_cast<int>(sizeof(Header))) {
+            return false; 
+        }
+
+        Header header;
+        if (!ReadHeader(headerBuffer.data(), bytesRead, header)) {
+            return false;
+        }
+
+        std::vector<char> payloadBuffer;
+        if (header.length > 0) {
+            payloadBuffer.resize(header.length);
+            size_t totalReceived = 0;
+            while (totalReceived < header.length) {
+                int received = socket->Receive(payloadBuffer.data() + totalReceived, header.length - totalReceived);
+                if (received <= 0) {
+                    return false;
+                }
+                totalReceived += received;
+            }
+        }
+
+        outPacket.header = header;
+        outPacket.payload = payloadBuffer;
+        return true;
     }
 
 }

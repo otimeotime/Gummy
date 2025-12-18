@@ -2,9 +2,9 @@
 #define AUTHSERVER_HPP
 
 #pragma once
-#include "../common/network/Packet.hpp"
-#include "UserDAO.hpp"
-#include "DatabaseServer.hpp"
+#include "../../common/network/Packet.hpp"
+#include "../database/UserDAO.hpp"
+#include "../database/DatabaseServer.hpp"
 #include <iostream>
 #include <vector>
 #include <cstring>

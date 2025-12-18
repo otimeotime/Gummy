@@ -4,6 +4,8 @@
 #include <PacketType.hpp>
 #include <cstdint>
 #include <vector>
+#include <cstring>
+#include <stdexcept>
 
 #pragma pack(push, 1) // Ensure no padding is added by the compiler
 typedef struct {

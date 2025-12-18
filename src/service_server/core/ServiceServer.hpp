@@ -20,6 +20,7 @@ public:
     ServiceServer();
     ~ServiceServer();
 
+    UserDAO* CreateAndConnectDAO();
     // The main loop that waits for connections
     void Run(int port);
     

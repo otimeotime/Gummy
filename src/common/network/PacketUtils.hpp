@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <iostream>
 
 namespace PacketUtils {
     // Serialization
@@ -24,6 +25,35 @@ namespace PacketUtils {
     template <typename T>
     bool SendPacket(TCPSocket* socket, PacketType type, const T& payloadStruct);
     bool SendPacket(TCPSocket* socket, PacketType type);
-};
+    template <typename T>
+    bool ReceivePacketPayload(TCPSocket* socket, T& outPayload);
+    bool ReceivePacket(TCPSocket* socket, Packet& outPacket);
+}
+
+// Template implementations must be in header file
+template <typename T>
+bool PacketUtils::SendPacket(TCPSocket* socket, PacketType type, const T& payloadStruct) {
+    Packet packet(type);
+    packet.SetPayload(payloadStruct);
+    std::vector<char> buffer;
+    PacketUtils::SerializePacket(packet, buffer);
+    return socket->Send(buffer.data(), buffer.size());
+}
+
+template <typename T>
+bool PacketUtils::ReceivePacketPayload(TCPSocket* socket, T& outPayload) {
+    Packet packet;
+    if (!ReceivePacket(socket, packet)) {
+        return false;
+    }
+
+    try {
+        outPayload = packet.GetPayload<T>();
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "PacketUtils: Failed to cast payload: " << e.what() << std::endl;
+        return false;
+    }
+}
 
 #endif // PACKET_UTILS_HPP

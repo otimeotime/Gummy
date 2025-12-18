@@ -3,6 +3,23 @@
 #include "../../common/network/PacketStructs.hpp"
 #include <iostream>
 
+UserDAO* ServiceServer::CreateAndConnectDAO() {
+    DatabaseServer* db = new DatabaseServer("gummydatabase", "postgres", "Hehehe123");
+    
+    if (!db->connect()) {
+        std::cerr << "ServiceServer: Could not connect to database!" << std::endl;
+    } else {
+        std::cout << "ServiceServer: Database connected successfully." << std::endl;
+    }
+
+    return new UserDAO(db);
+}
+
+ServiceServer::ServiceServer() 
+    : mIsRunning(false),
+      mAuthServer(CreateAndConnectDAO())
+{}
+
 ServiceServer::~ServiceServer() {
     Stop();
 }
