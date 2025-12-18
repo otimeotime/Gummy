@@ -29,7 +29,7 @@ typedef struct {
 // --------------------------------------------------------
 // Home Game Packets --------------------------------------
 typedef struct {
-    uint32_t userId[32];
+    char query_username[32];
 } ReqSearchUser;
 
 typedef struct {
@@ -48,6 +48,10 @@ typedef struct {
     bool isSuccess;
     char message[100];
 } ResUpdateProfile;
+
+typedef struct {
+    char username[32];
+} ReqGetProfile;
 
 typedef struct {
     char username[32];

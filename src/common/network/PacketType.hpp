@@ -9,6 +9,7 @@ enum PacketType {
     REQ_CHANGE_PASSWORD,
     RES_CHANGE_PASSWORD,
     // Home Game Packets
+    REQ_GET_PROFILE,
     RES_GET_PROFILE,
     REQ_UPDATE_PROFILE,
     RES_UPDATE_PROFILE,
