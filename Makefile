@@ -7,10 +7,10 @@ LDFLAGS  := -lSDL2 -lSDL2_image
 TARGET   := ui_test
 
 # Source Definitions
-ENTRY_POINT := src/engine/uitest.cpp
-CORE_SRCS   := $(wildcard src/engine/core/*.cpp)
-UI_SRCS     := $(wildcard src/engine/ui/*.cpp)
-SCENE_SRCS  := $(wildcard src/engine/scenes/*.cpp)
+ENTRY_POINT := src/client/uitest.cpp
+CORE_SRCS   := $(wildcard src/client/core/*.cpp)
+UI_SRCS     := $(wildcard src/client/ui/*.cpp)
+SCENE_SRCS  := $(wildcard src/client/scenes/*.cpp)
 
 # Combined Source List
 SRCS     := $(ENTRY_POINT) $(CORE_SRCS) $(UI_SRCS) $(SCENE_SRCS)
