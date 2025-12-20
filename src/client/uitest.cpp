@@ -1,6 +1,4 @@
 #include "core/Game.hpp"
-// You will include your scenes here later, e.g.:
-// #include "scenes/SceneLogin.hpp"
 
 #include "scenes/SceneTest.hpp" //Test purpose
 
