@@ -6,6 +6,7 @@
 typedef struct Position {
     float x;
     float y;
+    bool orient;
 } Position;
 
 typedef struct Velocity {
@@ -27,9 +28,9 @@ private:
     bool m_isMyTurn;
 
 public:
-    Player(int id, std::string name, float startX, float startY)
+    Player(int id, std::string name, float startX, float startY, bool startOrient)
         : m_id(id), m_name(name), m_hp(100), m_isAlive(true), m_isMyTurn(false) {
-            m_position = {startX, startY};
+            m_position = {startX, startY, startOrient};
             m_velocity = {0.0f, 0.0f};
             m_angle = 45.0f;
             m_power = 0.0f;
@@ -41,6 +42,7 @@ public:
 
     void setPosition(Position pos) { m_position = pos; }
     void setVelocity(Velocity vel) { m_velocity = vel; }
+    void setOrient(bool orient) {m_position.orient = orient; }
 
     void moveLeft() { m_velocity.vx = -SPEED; }
     void moveRight() { m_velocity.vx = SPEED; }

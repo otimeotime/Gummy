@@ -27,6 +27,8 @@ public:
     // Remove texture from memory
     void clearFromTextureMap(std::string id);
 
+    void drawScaled(std::string id, int x, int y, int width, int height, SDL_Renderer* renderer, double angle = 0.0, SDL_RendererFlip flip = SDL_FLIP_NONE);
+
 private:
     TextureManager() {}
     std::map<std::string, SDL_Texture*> textureMap;
