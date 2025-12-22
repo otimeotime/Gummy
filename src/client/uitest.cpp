@@ -1,17 +1,17 @@
 #include "core/Game.hpp"
-#include "scenes/SceneTest.hpp" // Include the test scene
+#include "scenes/SceneLogin.hpp" // Include the test scene
 
 const int FPS = 60;
 const int DELAY_TIME = 1000.0f / FPS;
 
 int main(int argc, char* argv[]) {
     // 1. Init
-    if (!Game::getInstance()->init("Gummy UI Test", 800, 600)) {
+    if (!Game::getInstance()->init("Gummy UI Test", 1920, 1080)) {
         return -1;
     }
 
     // 2. Push the Test Scene
-    Game::getInstance()->getStateMachine()->pushState(new SceneTest());
+    Game::getInstance()->getStateMachine()->pushState(new SceneLogin());
 
     // 3. Game Loop
     Uint32 frameStart, frameTime;
