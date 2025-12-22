@@ -7,6 +7,7 @@
 #include "../../ingame_server/logic/Player.hpp"
 #include "../../ingame_server/logic/PhysicsEngine.hpp"
 #include <string>
+#include <SDL2/SDL_ttf.h>
 
 class SceneGame : public GameState {
 public:
@@ -29,10 +30,12 @@ private:
     bool m_mapModified;
     void createMapTexture();
     void updateMapTexture();
+    void renderHealthBar(Position playerPos);
     MapLoader* m_mapLoader;
     SDL_Texture* m_mapTexture;
     PhysicsEngine* m_physics;
     Player* m_player;
     std::vector<Player*> m_players;
     std::vector<Projectile> m_projectiles;
+    TTF_Font* m_font;
 };

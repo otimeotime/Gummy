@@ -1,11 +1,12 @@
 #include <string>
 #include "SceneGame.hpp"
+#include <SDL2/SDL_ttf.h>
 
 #define delta_time 0.5f
 
 SceneGame::SceneGame(std::string mapToLoad) 
     : m_mapToLoad(mapToLoad), m_playerX(0), m_playerY(0), m_startOrient(0),
-      m_mapLoader(nullptr), m_mapTexture(nullptr), m_physics(new PhysicsEngine()), m_player(nullptr) {
+      m_mapLoader(nullptr), m_mapTexture(nullptr), m_physics(new PhysicsEngine()), m_player(nullptr), m_font(nullptr) {
 }
 
 bool SceneGame::onEnter() {
@@ -13,6 +14,12 @@ bool SceneGame::onEnter() {
     m_bulletID = "bullet";
     m_playerID = "player";
     m_mapModified = true;  // Create texture on first render
+
+    // Load font for HUD text
+    m_font = TTF_OpenFont("assets/font.ttf", 20);
+    if (!m_font) {
+        std::cout << "Warning: Failed to load font! Text rendering will not be available." << std::endl;
+    }
 
     std::cout << "Entering Game Scene..." << std::endl;
     if (!TextureManager::getInstance()->load("assets/gameplay_background.png", m_bgTextureID, Game::getInstance()->getRenderer())) {
@@ -77,6 +84,12 @@ bool SceneGame::onExit() {
         delete m_physics;
         m_physics = nullptr;
     }
+    
+    if (m_font) {
+        TTF_CloseFont(m_font);
+        m_font = nullptr;
+    }
+    
     m_players.clear();
 
     return true;
@@ -114,6 +127,13 @@ void SceneGame::update() {
         }
         if (InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_S)) {
             m_player->adjustAngle(-0.5f); // Decrease angle
+        }
+        
+        // Clamp angle between 0 and 180 (exclusive of 180)
+        if (m_player->m_angle < 0.0f) {
+            m_player->m_angle = 0.0f;
+        } else if (m_player->m_angle > 180.0f) {
+            m_player->m_angle = 180.0f;
         }
 
         // --- 3. FIRING (Spacebar) ---
@@ -167,13 +187,23 @@ void SceneGame::render() {
     for (const auto& player : m_players) {
         if (player && player->isAlive()) {
             Position pos = player->getPosition();
+
+            // Player sprite faces right by default; flip when facing left.
+            SDL_RendererFlip flip = (pos.orient == 0) ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
             
             TextureManager::getInstance()->drawScaled(
                 m_playerID, 
                 (int)pos.x, (int)pos.y, 
                 32, 32,
-                Game::getInstance()->getRenderer()
+                Game::getInstance()->getRenderer(),
+                0.0,
+                flip
             );
+            
+            // Render health bar above player
+            if (player == m_player) {
+                renderHealthBar(pos);
+            }
         }
     }
 
@@ -190,47 +220,35 @@ void SceneGame::render() {
     }
 
     // Display numeric HUD for Angle and Power
-    if (m_player) {
+    if (m_player && m_font) {
         SDL_Renderer* renderer = Game::getInstance()->getRenderer();
         
-        // Simple numeric display - just colored boxes to show values
-        // Note: For proper text rendering, SDL_ttf would be needed
-        
-        // Angle display - fill width based on angle (0-90 degrees)
-        SDL_Rect angleLabel = {10, 10, 50, 25};
-        SDL_SetRenderDrawColor(renderer, 100, 100, 150, 255);
-        SDL_RenderFillRect(renderer, &angleLabel);
-        
-        int angleWidth = (int)(m_player->m_angle / 90.0f * 80);  // Scale to max 80 pixels
-        SDL_Rect angleValue = {65, 10, angleWidth, 25};
-        SDL_SetRenderDrawColor(renderer, 100, 200, 255, 255);  // Light blue
-        SDL_RenderFillRect(renderer, &angleValue);
-        
-        SDL_Rect angleBox = {10, 10, 145, 25};
-        SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
-        SDL_RenderDrawRect(renderer, &angleBox);
-        
-        // Power display - fill width based on power (0-100)
-        SDL_Rect powerLabel = {10, 45, 50, 25};
-        SDL_SetRenderDrawColor(renderer, 150, 100, 100, 255);
-        SDL_RenderFillRect(renderer, &powerLabel);
-        
-        int powerWidth = (int)(m_player->m_power / 100.0f * 80);  // Scale to max 80 pixels
-        SDL_Rect powerValue = {65, 45, powerWidth, 25};
-        
-        // Color changes based on power level
-        if (m_player->m_power < 33) {
-            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);  // Green
-        } else if (m_player->m_power < 66) {
-            SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);  // Yellow
-        } else {
-            SDL_SetRenderDrawColor(renderer, 255, 100, 0, 255);  // Orange
+        // Render Angle text
+        std::string angleText = "Angle " + std::to_string((int)m_player->m_angle);
+        SDL_Color textColor = {255, 255, 255, 255};  // White
+        SDL_Surface* angleSurface = TTF_RenderText_Solid(m_font, angleText.c_str(), textColor);
+        if (angleSurface) {
+            SDL_Texture* angleTexture = SDL_CreateTextureFromSurface(renderer, angleSurface);
+            if (angleTexture) {
+                SDL_Rect angleRect = {10, 10, angleSurface->w, angleSurface->h};
+                SDL_RenderCopy(renderer, angleTexture, NULL, &angleRect);
+                SDL_DestroyTexture(angleTexture);
+            }
+            SDL_FreeSurface(angleSurface);
         }
-        SDL_RenderFillRect(renderer, &powerValue);
         
-        SDL_Rect powerBox = {10, 45, 145, 25};
-        SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
-        SDL_RenderDrawRect(renderer, &powerBox);
+        // Render Power text
+        std::string powerText = "Power " + std::to_string((int)m_player->m_power);
+        SDL_Surface* powerSurface = TTF_RenderText_Solid(m_font, powerText.c_str(), textColor);
+        if (powerSurface) {
+            SDL_Texture* powerTexture = SDL_CreateTextureFromSurface(renderer, powerSurface);
+            if (powerTexture) {
+                SDL_Rect powerRect = {10, 40, powerSurface->w, powerSurface->h};
+                SDL_RenderCopy(renderer, powerTexture, NULL, &powerRect);
+                SDL_DestroyTexture(powerTexture);
+            }
+            SDL_FreeSurface(powerSurface);
+        }
     }
 }
 
@@ -252,10 +270,7 @@ void SceneGame::createMapTexture() {
         return;
     }
 
-    // --- NEW: ENABLE BLENDING ---
-    // This tells SDL to treat the Alpha channel (00) as transparent
     SDL_SetTextureBlendMode(m_mapTexture, SDL_BLENDMODE_BLEND); 
-    // -----------------------------
 
     // 2. Lock and Write Pixels
     void* pixels;
@@ -307,4 +322,44 @@ void SceneGame::updateMapTexture() {
     }
 
     SDL_UnlockTexture(m_mapTexture);
+}
+
+void SceneGame::renderHealthBar(Position playerPos) {
+    if (!m_player) return;
+
+    SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+    
+    // Poll current health from player
+    int currentHealth = m_player->getHP();
+    int maxHealth = 100;
+    
+    // Health bar dimensions and position (above player)
+    int barWidth = 40;
+    int barHeight = 6;
+    int barX = (int)playerPos.x + (32 - barWidth) / 2;  // Center above player (player is 32x32)
+    int barY = (int)playerPos.y - 10;  // 10 pixels above player
+    
+    // Background bar (dark red)
+    SDL_Rect healthBg = {barX, barY, barWidth, barHeight};
+    SDL_SetRenderDrawColor(renderer, 100, 20, 20, 255);
+    SDL_RenderFillRect(renderer, &healthBg);
+    
+    // Health fill bar (red to green gradient based on health)
+    int healthWidth = (int)((currentHealth / (float)maxHealth) * barWidth);
+    SDL_Rect healthFill = {barX, barY, healthWidth, barHeight};
+    
+    // Color changes based on health level
+    if (currentHealth > 66) {
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);  // Green
+    } else if (currentHealth > 33) {
+        SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);  // Yellow
+    } else {
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);  // Red
+    }
+    SDL_RenderFillRect(renderer, &healthFill);
+    
+    // Border
+    SDL_Rect healthBox = {barX, barY, barWidth, barHeight};
+    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+    SDL_RenderDrawRect(renderer, &healthBox);
 }

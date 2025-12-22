@@ -9,7 +9,6 @@ struct Projectile {
     Position position;
     Velocity velocity;
     bool isActive;
-    int ownerId;
 };
 
 class PhysicsEngine {
@@ -99,8 +98,9 @@ public:
 
             // Check collision with players
             for (auto p : players) {
-                if (p->getId() != proj.ownerId && p->isAlive()) {
+                if (p->isAlive()) {
                     if (checkCollision(proj, p)) {
+                        std::cerr << "Player" << p->getId() << "took damage" << std::endl;
                         proj.isActive = false;
                         p->takeDamage(10); // Deal 10 damage on hit
                         break;
@@ -127,7 +127,6 @@ public:
         proj.velocity.vx = std::cos(rad) * p->m_power * 1.0f * directionMult;
         proj.velocity.vy = -std::sin(rad) * p->m_power * 1.0f;
         proj.isActive = true;
-        proj.ownerId = p->getId();
         projectiles.push_back(proj);
     }
 

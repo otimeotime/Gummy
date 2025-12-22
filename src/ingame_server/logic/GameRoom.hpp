@@ -1,6 +1,7 @@
 #pragma once
 #include "Player.hpp"
 #include "PhysicsEngine.hpp"
+#include "MapLoader.hpp"
 #include <vector>
 #include <iostream>
 
@@ -21,7 +22,7 @@ private:
     RoomState m_state;
     int m_currentTurnIndex;
     float m_turnTimer;
-
+    MapLoader* m_mapLoader;
     void switchTurn() {
         m_players[m_currentTurnIndex]->setTurn(false);
         m_players[m_currentTurnIndex]->stopMoving();
@@ -60,7 +61,7 @@ public:
 
     void addPlayer(int id, std::string name) {
         float startX = 100.0f + m_players.size() * 200.0f;
-        m_players.push_back(new Player(id, name, startX, 0));
+        m_players.push_back(new Player(id, name, startX, 0, 0));
     }
 
     void startGame() {
@@ -74,7 +75,7 @@ public:
 
     void update(float deltaTime) {
         // Physics update
-        m_physics->update(deltaTime, m_players, m_projectiles);
+        m_physics->update(deltaTime, m_players, m_projectiles, m_mapLoader);
 
         // Game logic
         if (m_state == PLAYING_TURN) {
