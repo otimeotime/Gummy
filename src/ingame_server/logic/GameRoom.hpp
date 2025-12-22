@@ -40,7 +40,7 @@ private:
         m_pendingShooter = nullptr;
         m_waitingForShot = false;
 
-        m_physics->setWind((rand() % 20) - 10.0f);
+        m_physics->setWind(0);
     }
 
     bool hasActiveProjectile(const std::vector<Projectile>& projectiles) const {

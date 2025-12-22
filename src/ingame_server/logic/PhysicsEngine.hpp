@@ -5,6 +5,7 @@
 #include <cmath>
 
 #define PI 3.14159265f
+#define gameSpeed 40.0f
 
 struct Projectile {
     Position position;
@@ -30,7 +31,7 @@ private:
 
 public:
     PhysicsEngine()
-        : GRAVITY(0.98f),
+                : GRAVITY(0.98f),
           WIND(0.0f),
           m_terrainModified(false),
           m_hasLastExplosion(false),
@@ -51,16 +52,23 @@ public:
     }
 
     void update(float deltaTime, std::vector<Player*>& players, std::vector<Projectile>& projectiles, MapLoader* map) {
+        // The game constants (SPEED, GRAVITY, power -> velocity) are tuned for a ~60 FPS fixed step.
+        // The engine provides deltaTime in seconds, so convert to a 60 FPS-scaled step to avoid
+        // slow-motion movement/projectiles.
+        float simDt = deltaTime * gameSpeed;
+        if (simDt < 0.0f) simDt = 0.0f;
+        if (simDt > 3.0f) simDt = 3.0f; // clamp (prevents huge jumps on stalls)
+
         // Update players
         for (auto p : players) {
             if(!p->isAlive()) continue;
 
             // Apply gravity
-            p->m_velocity.vy += GRAVITY * deltaTime;
+            p->m_velocity.vy += GRAVITY * simDt;
 
             // Apply velocity
-            p->m_position.x += p->m_velocity.vx * deltaTime;
-            p->m_position.y += p->m_velocity.vy * deltaTime;
+            p->m_position.x += p->m_velocity.vx * simDt;
+            p->m_position.y += p->m_velocity.vy * simDt;
 
             // --- NEW: PIXEL-PERFECT COLLISION ---
             
@@ -99,14 +107,14 @@ public:
             if (!proj.isActive) continue;
 
             // Apply gravity
-            proj.velocity.vy += GRAVITY * deltaTime;
+            proj.velocity.vy += GRAVITY * simDt;
 
             // Apply wind
-            proj.velocity.vx += WIND * deltaTime;
+            proj.velocity.vx += WIND * simDt;
 
             // Update position
-            proj.position.x += proj.velocity.vx * deltaTime;
-            proj.position.y += proj.velocity.vy * deltaTime;
+            proj.position.x += proj.velocity.vx * simDt;
+            proj.position.y += proj.velocity.vy * simDt;
 
             // Check collision with map
             if (map->isSolid(proj.position.x, proj.position.y)) {

@@ -1,7 +1,7 @@
 #ifndef PACKET_STRUCTS_H
 #define PACKET_STRUCTS_H
 
-#include <PacketType.hpp>
+#include "PacketType.hpp"
 #include <cstdint>
 
 // User Authentication Packets ----------------------------

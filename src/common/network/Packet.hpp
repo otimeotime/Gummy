@@ -1,7 +1,7 @@
 #ifndef PACKET_HPP
 #define PACKET_HPP
 
-#include <PacketType.hpp>
+#include "PacketType.hpp"
 #include <cstdint>
 #include <vector>
 #include <cstring>
