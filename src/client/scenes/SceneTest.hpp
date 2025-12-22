@@ -1,67 +1,63 @@
 #pragma once
 #include "../core/GameState.hpp"
-#include "../core/Game.hpp"
-#include "../core/TextureManager.hpp"
+#include "../ui/Text.hpp"
+#include "../ui/TextInput.hpp"
 #include "../ui/Button.hpp"
+#include <vector>
 #include <iostream>
 
 class SceneTest : public GameState {
 public:
-    // Pointer to our button
-    Button* m_btnQuit = nullptr;
-    std::string btnTextureID = "btn_quit";
+    // Polymorphism: Manage all UI elements in one list
+    std::vector<UIObject*> m_uiObjects; 
 
     virtual bool onEnter() override {
         std::cout << "[SceneTest] Entering..." << std::endl;
-        
-        // 1. Load the Button Texture (Sprite Sheet)
-        // IMPORTANT: The image must have 3 frames (Normal, Hover, Clicked)
-        // Ensure you have "assets/button.png" in your project folder
-        if (!TextureManager::getInstance()->load("assets/button.png", btnTextureID, Game::getInstance()->getRenderer())) {
-            std::cout << "[SceneTest] Failed to load button texture!" << std::endl;
-            return false;
-        }
 
-        // 2. Create the Button
-        // Position: (300, 200), Size: 200x50
-        // Callback: Using a Lambda function to Quit the game when clicked
-        m_btnQuit = new Button(
-            300, 200, 181, 73, 
-            btnTextureID, 
-            []() {
-                std::cout << "[SceneTest] Button Clicked! Quitting Game..." << std::endl;
-                Game::getInstance()->quit();
-            }
-        );
+        // 1. Add a Static Label (Text)
+        // Position: (300, 150), Font size: 24, Color: Red
+        Text* lblName = new Text(300, 150, "assets/Arial.ttf", 24, "Enter Username:", {255, 0, 0, 255});
+        m_uiObjects.push_back(lblName);
+
+        // 2. Add an Input Field (TextInput)
+        // Position: (300, 200), Width: 250, Height: 40
+        TextInput* inputName = new TextInput(300, 200, 250, 40, "assets/Arial.ttf", 20);
+        m_uiObjects.push_back(inputName);
+
+        // 3. Add a Submit Button (Using your Button class)
+        // Position: (300, 260)
+        Button* btnSubmit = new Button(300, 260, 100, 50, "btn_submit", [inputName]() {
+            // Callback: Print the text when button is clicked
+            std::cout << "User typed: " << inputName->getString() << std::endl;
+        });
+        m_uiObjects.push_back(btnSubmit);
 
         return true;
     }
 
     virtual void update() override {
-        // 3. Update Button Logic (Check for mouse hover/click)
-        if (m_btnQuit) {
-            m_btnQuit->update();
+        // Update all objects in one loop
+        for (auto obj : m_uiObjects) {
+            obj->update();
         }
     }
 
     virtual void render() override {
-        // 4. Draw the Button
-        if (m_btnQuit) {
-            m_btnQuit->draw();
+        // Render all objects in one loop
+        for (auto obj : m_uiObjects) {
+            obj->draw();
         }
     }
 
     virtual bool onExit() override {
         std::cout << "[SceneTest] Exiting..." << std::endl;
-
-        // 5. CLEANUP (Very Important)
-        if (m_btnQuit) {
-            delete m_btnQuit;
-            m_btnQuit = nullptr;
+        
+        // Clean up memory
+        for (auto obj : m_uiObjects) {
+            obj->clean();
+            delete obj;
         }
-
-        // Remove texture from RAM
-        TextureManager::getInstance()->clearFromTextureMap(btnTextureID);
+        m_uiObjects.clear();
         return true;
     }
 
