@@ -2,12 +2,13 @@
 #include <SDL2/SDL.h>
 #include <vector>
 #include <iostream>
+#include "../../common/gui/Vector2D.hpp"
 
-// Simple Vector2D struct for Mouse Position
-struct Vector2D {
-    float x;
-    float y;
-};
+// // Simple Vector2D struct for Mouse Position
+// struct Vector2D {
+//     float x;
+//     float y;
+// };
 
 class InputHandler {
 public:

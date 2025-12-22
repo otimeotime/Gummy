@@ -1,5 +1,5 @@
 #pragma once
-#include "../../common/Vector2D.hpp"
+#include "../../common/gui/Vector2D.hpp"
 
 class UIObject {
 public:
