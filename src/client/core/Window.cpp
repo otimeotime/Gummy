@@ -74,8 +74,16 @@ void Window::display() {
 }
 
 void Window::clean() {
-    SDL_DestroyWindow(window);
-    SDL_DestroyRenderer(renderer);
+    if (renderer) {
+        SDL_DestroyRenderer(renderer);
+        renderer = nullptr;
+    }
+    if (window) {
+        SDL_DestroyWindow(window);
+        window = nullptr;
+    }
+
+    IMG_Quit();
     SDL_Quit();
     std::cout << "Game Cleaned" << std::endl;
 }

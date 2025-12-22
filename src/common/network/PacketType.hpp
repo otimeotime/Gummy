@@ -27,6 +27,12 @@ enum PacketType {
     RES_PLAY,
     RES_EXECUTE_PLAY,
     GAME_RESULT,
+
+    // In-game realtime (authoritative ingame server)
+    REQ_INGAME_JOIN,
+    RES_INGAME_JOIN,
+    REQ_INGAME_INPUT,
+    RES_INGAME_STATE,
 };
 
 #endif // PACKET_TYPE_HPP

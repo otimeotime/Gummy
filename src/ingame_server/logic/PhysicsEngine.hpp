@@ -1,5 +1,6 @@
 #pragma once
 #include "Player.hpp"
+#include "MapLoader.hpp"
 #include <vector>
 #include <cmath>
 
@@ -16,6 +17,10 @@ private:
     const float GRAVITY;
     float WIND;
     bool m_terrainModified;
+    bool m_hasLastExplosion;
+    float m_lastExplosionX;
+    float m_lastExplosionY;
+    float m_lastExplosionRadius;
 
     bool checkCollision(const Projectile& proj, const Player* p) {
         float dx = proj.position.x - p->getPosition().x;
@@ -24,10 +29,26 @@ private:
     }
 
 public:
-    PhysicsEngine(): GRAVITY(0.98f), WIND(0.0f), m_terrainModified(false) {}
+    PhysicsEngine()
+        : GRAVITY(0.98f),
+          WIND(0.0f),
+          m_terrainModified(false),
+          m_hasLastExplosion(false),
+          m_lastExplosionX(0.0f),
+          m_lastExplosionY(0.0f),
+          m_lastExplosionRadius(0.0f) {}
 
     bool hasTerrainBeenModified() const { return m_terrainModified; }
     void resetTerrainModifiedFlag() { m_terrainModified = false; }
+
+    bool consumeLastExplosion(float& outX, float& outY, float& outRadius) {
+        if (!m_hasLastExplosion) return false;
+        outX = m_lastExplosionX;
+        outY = m_lastExplosionY;
+        outRadius = m_lastExplosionRadius;
+        m_hasLastExplosion = false;
+        return true;
+    }
 
     void update(float deltaTime, std::vector<Player*>& players, std::vector<Projectile>& projectiles, MapLoader* map) {
         // Update players
@@ -92,6 +113,10 @@ public:
                 // Create an explosion effect with radius of 30 pixels
                 map->applyExplosion(proj.position.x, proj.position.y, 30.0f);
                 m_terrainModified = true;  // Mark terrain as modified
+                m_hasLastExplosion = true;
+                m_lastExplosionX = proj.position.x;
+                m_lastExplosionY = proj.position.y;
+                m_lastExplosionRadius = 30.0f;
                 proj.isActive = false;
                 continue;
             }

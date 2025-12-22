@@ -26,18 +26,18 @@ ServiceServer::~ServiceServer() {
 
 void ServiceServer::Stop() {
     mIsRunning = false;
-    mServerSocket.Close();
+    mServiceServerSocket.Close();
 }
 
 void ServiceServer::Run(int port) {
     try {
-        mServerSocket.Bind(port);
-        mServerSocket.Listen();
+        mServiceServerSocket.Bind(port);
+        mServiceServerSocket.Listen();
         mIsRunning = true;
         std::cout << "ServiceServer Listening on port " << port << std::endl;
 
         while (mIsRunning) {
-            TCPSocket* clientSocket = mServerSocket.Accept();
+            TCPSocket* clientSocket = mServiceServerSocket.Accept();
             if (clientSocket == nullptr) {
                 continue;
             }

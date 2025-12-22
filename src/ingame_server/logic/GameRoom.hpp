@@ -67,17 +67,41 @@ private:
 
 public:
     GameRoom(const std::vector<Player*>& players)
-        : m_state(WAITING_FOR_PLAYERS),
-          m_currentTurnIndex(0),
-          m_turnTimer(0.0f),
-          m_mapLoader(nullptr),
-          m_pendingShooter(nullptr),
-          m_waitingForShot(false),
-          m_players(players) {
-        m_physics = new PhysicsEngine();
-    }
+                : m_players(players),
+                    m_projectiles(),
+                    m_physics(new PhysicsEngine()),
+                    m_state(WAITING_FOR_PLAYERS),
+                    m_currentTurnIndex(0),
+                    m_turnTimer(0.0f),
+                    m_mapLoader(nullptr),
+                    m_pendingShooter(nullptr),
+                    m_waitingForShot(false) {}
 
     ~GameRoom() { delete m_physics; }
+
+    void setMapLoader(MapLoader* mapLoader) { m_mapLoader = mapLoader; }
+
+    const std::vector<Player*>& getPlayers() const { return m_players; }
+    const std::vector<Projectile>& getProjectiles() const { return m_projectiles; }
+
+    Player* getPlayerById(int id) const {
+        for (auto* p : m_players) {
+            if (p && p->getId() == id) return p;
+        }
+        return nullptr;
+    }
+
+    bool consumeTerrainModified() {
+        if (!m_physics) return false;
+        if (!m_physics->hasTerrainBeenModified()) return false;
+        m_physics->resetTerrainModifiedFlag();
+        return true;
+    }
+
+    bool consumeLastExplosion(float& outX, float& outY, float& outRadius) {
+        if (!m_physics) return false;
+        return m_physics->consumeLastExplosion(outX, outY, outRadius);
+    }
 
     void addPlayer(int id, std::string name) {
         float startX = 100.0f + m_players.size() * 200.0f;
@@ -110,9 +134,15 @@ public:
         if (m_state != PLAYING_TURN) return false;
         Player* shooter = getCurrentPlayer();
         if (!shooter || !shooter->isAlive()) return false;
+        if (!m_physics || !m_mapLoader) return false;
+
+        // Fire immediately; GameRoom owns the projectiles/physics.
+        m_physics->fireProjectile(shooter, m_projectiles);
+        shooter->m_power = 0.0f;
+
         m_state = FIRING_PHASE;
-        m_pendingShooter = shooter;
-        m_waitingForShot = true;
+        m_pendingShooter = nullptr;
+        m_waitingForShot = false;
         return true;
     }
 
@@ -149,7 +179,31 @@ public:
 
     // Backward-compatible update for existing code paths.
     void update(float deltaTime) {
-        update(deltaTime, m_projectiles);
+        // Use real delta for physics on the server; clamp to keep stability.
+        float physicsDt = deltaTime;
+        if (physicsDt < 0.0f) physicsDt = 0.0f;
+        if (physicsDt > 0.033f) physicsDt = 0.033f; // ~30 FPS worst-case step
+
+        if (m_physics && m_mapLoader) {
+            m_physics->update(physicsDt, m_players, m_projectiles, m_mapLoader);
+        }
+
+        if (m_state == PLAYING_TURN) {
+            m_turnTimer -= deltaTime;
+            if (m_turnTimer <= 0.0f) {
+                commitShot();
+            }
+            return;
+        }
+
+        if (m_state == FIRING_PHASE) {
+            if (!hasActiveProjectile(m_projectiles)) {
+                checkWinCondition();
+                if (m_state != GAME_OVER) {
+                    switchTurn();
+                }
+            }
+        }
     }
 
     void handleInput(int playerId, std::string command, float value = 0.0f) {
@@ -159,17 +213,22 @@ public:
         if (currentPlayer->getId() != playerId) return;
         if (command == "MOVE_LEFT") {
             currentPlayer->moveLeft();
+            currentPlayer->setOrient(0);
         } else if (command == "MOVE_RIGHT") {
             currentPlayer->moveRight();
+            currentPlayer->setOrient(1);
         } else if (command == "STOP") {
             currentPlayer->stopMoving();
         } else if (command == "ADJUST_ANGLE") {
             currentPlayer->adjustAngle(value);
+            if (currentPlayer->m_angle < 0.0f) currentPlayer->m_angle = 0.0f;
+            if (currentPlayer->m_angle > 180.0f) currentPlayer->m_angle = 180.0f;
         } else if (command == "ADJUST_POWER") {
             currentPlayer->adjustPower(value);
+            if (currentPlayer->m_power < 0.0f) currentPlayer->m_power = 0.0f;
+            if (currentPlayer->m_power > 100.0f) currentPlayer->m_power = 100.0f;
         } else if (command == "FIRE") {
-            m_physics->fireProjectile(currentPlayer, m_projectiles);
-            m_state = FIRING_PHASE;
+            commitShot();
         }
     }
 };

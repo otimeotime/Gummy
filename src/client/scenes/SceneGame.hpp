@@ -5,7 +5,6 @@
 #include "../core/InputHandler.hpp"
 #include "../../ingame_server/logic/MapLoader.hpp"
 #include "../../ingame_server/logic/Player.hpp"
-#include "../../ingame_server/logic/PhysicsEngine.hpp"
 #include "../../ingame_server/logic/GameRoom.hpp"
 #include <string>
 #include <SDL2/SDL.h>
@@ -36,10 +35,8 @@ private:
     GameRoom* m_gameRoom;
     MapLoader* m_mapLoader;
     SDL_Texture* m_mapTexture;
-    PhysicsEngine* m_physics;
     Player* m_player;
     std::vector<Player*> m_players;
-    std::vector<Projectile> m_projectiles;
     TTF_Font* m_font;
     Uint32 m_lastTick;
 };

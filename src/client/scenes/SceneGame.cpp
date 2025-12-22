@@ -3,8 +3,20 @@
 #include <SDL2/SDL_ttf.h>
 
 SceneGame::SceneGame(std::string mapToLoad) 
-    : m_mapToLoad(mapToLoad), m_playerX(0), m_playerY(0), m_startOrient(0),
-    m_mapLoader(nullptr), m_mapTexture(nullptr), m_physics(new PhysicsEngine()), m_player(nullptr), m_font(nullptr), m_gameRoom(nullptr), m_lastTick(0) {
+    : m_mapToLoad(mapToLoad),
+      m_bgTextureID(""),
+      m_playerID(""),
+      m_bulletID(""),
+      m_playerX(0),
+      m_playerY(0),
+      m_startOrient(0),
+      m_mapModified(false),
+      m_gameRoom(nullptr),
+      m_mapLoader(nullptr),
+      m_mapTexture(nullptr),
+      m_player(nullptr),
+      m_font(nullptr),
+      m_lastTick(0) {
 }
 
 bool SceneGame::onEnter() {
@@ -63,6 +75,7 @@ bool SceneGame::onEnter() {
         m_gameRoom = nullptr;
     }
     m_gameRoom = new GameRoom(m_players);
+    m_gameRoom->setMapLoader(m_mapLoader);
     m_gameRoom->startGame();
 
     return true;
@@ -81,16 +94,6 @@ bool SceneGame::onExit() {
         m_mapTexture = nullptr;
     }
 
-    if (m_player) {
-        delete m_player;
-        m_player = nullptr;
-    }
-
-    if (m_physics) {
-        delete m_physics;
-        m_physics = nullptr;
-    }
-
     if (m_gameRoom) {
         delete m_gameRoom;
         m_gameRoom = nullptr;
@@ -106,6 +109,8 @@ bool SceneGame::onExit() {
     }
     m_players.clear();
 
+    m_player = nullptr;
+
     return true;
 }
 
@@ -117,95 +122,59 @@ void SceneGame::update() {
     if (dt < 0.0f) dt = 0.0f;
     if (dt > 0.1f) dt = 0.1f; // clamp to avoid huge jumps on pauses
 
-    // The physics/gameplay code in this project was tuned with a fixed step.
-    // Use real dt for timers, but keep physics step consistent to avoid slow-motion.
-    const float physicsDt = 0.5f;
-
     if (InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_ESCAPE)) {
         Game::getInstance()->quit();
     }
 
     const bool isPlayingTurn = (m_gameRoom && m_gameRoom->getState() == PLAYING_TURN);
 
-    if (m_player && m_player->isAlive() && m_player->isMyTurn() && isPlayingTurn) {
+    if (m_gameRoom && m_player && m_player->isAlive() && m_player->isMyTurn() && isPlayingTurn) {
         bool isMoving = false;
 
         // Move Left
         if (InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_A)) {
-            m_player->moveLeft();
+            m_gameRoom->handleInput(m_player->getId(), "MOVE_LEFT");
             isMoving = true;
-            m_player->setOrient(0);
         }
         // Move Right
         else if (InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_D)) {
-            m_player->moveRight();
+            m_gameRoom->handleInput(m_player->getId(), "MOVE_RIGHT");
             isMoving = true;
-            m_player->setOrient(1);
         }
 
         // Stop if no keys are pressed
         if (!isMoving) {
-            m_player->stopMoving();
+            m_gameRoom->handleInput(m_player->getId(), "STOP");
         }
 
         // --- 2. ANGLE ADJUSTMENT (W/S) ---
         if (InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_W)) {
-            m_player->adjustAngle(0.5f); // Increase angle
+            m_gameRoom->handleInput(m_player->getId(), "ADJUST_ANGLE", 0.5f);
         }
         if (InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_S)) {
-            m_player->adjustAngle(-0.5f); // Decrease angle
-        }
-        
-        // Clamp angle between 0 and 180 (exclusive of 180)
-        if (m_player->m_angle < 0.0f) {
-            m_player->m_angle = 0.0f;
-        } else if (m_player->m_angle > 180.0f) {
-            m_player->m_angle = 180.0f;
+            m_gameRoom->handleInput(m_player->getId(), "ADJUST_ANGLE", -0.5f);
         }
 
         // --- 3. POWER CHARGE (Spacebar) ---
         // Hold space to charge power; firing happens only on ENTER or timeout.
         bool isSpacePressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_SPACE);
         if (isSpacePressed) {
-            m_player->m_power += 60.0f * dt;
-            if (m_player->m_power > 100) m_player->m_power = 100;
+            m_gameRoom->handleInput(m_player->getId(), "ADJUST_POWER", 60.0f * dt);
         }
 
         // --- 4. CONFIRM (Enter) ---
         static bool wasEnterPressed = false;
         bool isEnterPressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_RETURN);
         if (isEnterPressed && !wasEnterPressed) {
-            m_gameRoom->commitShot();
+            m_gameRoom->handleInput(m_player->getId(), "FIRE");
         }
         wasEnterPressed = isEnterPressed;
     }
 
-    // If a shot was committed (ENTER or timeout), perform it exactly once.
     if (m_gameRoom) {
-        if (Player* shooter = m_gameRoom->takePendingShooter()) {
-            m_physics->fireProjectile(shooter, m_projectiles);
-            shooter->m_power = 0.0f;
-            m_gameRoom->notifyShotFired();
-        }
-    }
-
-    m_physics->update(physicsDt, m_players, m_projectiles, m_mapLoader);
-    
-    // Check if terrain was modified by an explosion
-    if (m_physics->hasTerrainBeenModified()) {
-        m_mapModified = true;
-        m_physics->resetTerrainModifiedFlag();
-    }
-
-    if (m_gameRoom) {
-        m_gameRoom->update(dt, m_projectiles);
-
-        // If the timer expired this frame, commitShot() happens inside GameRoom::update().
-        // Fire it now (projectile will update starting next frame).
-        if (Player* shooter = m_gameRoom->takePendingShooter()) {
-            m_physics->fireProjectile(shooter, m_projectiles);
-            shooter->m_power = 0.0f;
-            m_gameRoom->notifyShotFired();
+        m_gameRoom->update(dt);
+        if (m_gameRoom->consumeTerrainModified()) {
+            m_mapModified = true;
         }
     }
 }
@@ -229,8 +198,15 @@ void SceneGame::render() {
         SDL_RenderCopy(Game::getInstance()->getRenderer(), m_mapTexture, NULL, NULL);
     }
 
+    const std::vector<Player*>* playersToRender = nullptr;
+    const std::vector<Projectile>* projectilesToRender = nullptr;
+    if (m_gameRoom) {
+        playersToRender = &m_gameRoom->getPlayers();
+        projectilesToRender = &m_gameRoom->getProjectiles();
+    }
+
     // Render All Players
-    for (const auto& player : m_players) {
+    if (playersToRender) for (const auto& player : *playersToRender) {
         if (player && player->isAlive()) {
             Position pos = player->getPosition();
 
@@ -251,7 +227,7 @@ void SceneGame::render() {
     }
 
     // Render All Projectiles
-    for (const auto& proj : m_projectiles) {
+    if (projectilesToRender) for (const auto& proj : *projectilesToRender) {
         if (proj.isActive) {
             TextureManager::getInstance()->drawScaled(
                 m_bulletID,
