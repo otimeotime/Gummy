@@ -6,7 +6,9 @@
 #include "../../ingame_server/logic/MapLoader.hpp"
 #include "../../ingame_server/logic/Player.hpp"
 #include "../../ingame_server/logic/PhysicsEngine.hpp"
+#include "../../ingame_server/logic/GameRoom.hpp"
 #include <string>
+#include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
 class SceneGame : public GameState {
@@ -30,7 +32,8 @@ private:
     bool m_mapModified;
     void createMapTexture();
     void updateMapTexture();
-    void renderHealthBar(Position playerPos);
+    void renderHealthBar(Position playerPos, Player* player);
+    GameRoom* m_gameRoom;
     MapLoader* m_mapLoader;
     SDL_Texture* m_mapTexture;
     PhysicsEngine* m_physics;
@@ -38,4 +41,5 @@ private:
     std::vector<Player*> m_players;
     std::vector<Projectile> m_projectiles;
     TTF_Font* m_font;
+    Uint32 m_lastTick;
 };

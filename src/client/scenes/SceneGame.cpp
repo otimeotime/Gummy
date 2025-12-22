@@ -2,14 +2,14 @@
 #include "SceneGame.hpp"
 #include <SDL2/SDL_ttf.h>
 
-#define delta_time 0.5f
-
 SceneGame::SceneGame(std::string mapToLoad) 
     : m_mapToLoad(mapToLoad), m_playerX(0), m_playerY(0), m_startOrient(0),
-      m_mapLoader(nullptr), m_mapTexture(nullptr), m_physics(new PhysicsEngine()), m_player(nullptr), m_font(nullptr) {
+    m_mapLoader(nullptr), m_mapTexture(nullptr), m_physics(new PhysicsEngine()), m_player(nullptr), m_font(nullptr), m_gameRoom(nullptr), m_lastTick(0) {
 }
 
 bool SceneGame::onEnter() {
+    m_lastTick = SDL_GetTicks();
+
     m_bgTextureID = "background";
     m_bulletID = "bullet";
     m_playerID = "player";
@@ -26,11 +26,14 @@ bool SceneGame::onEnter() {
         std::cout << "Failed to load image!" << std::endl;
         return false;
     }
+    std::cout << "Background loaded." << std::endl;
     m_mapLoader = new MapLoader();
+    std::cout << "Loading map: " << m_mapToLoad << std::endl;
     if (!m_mapLoader->loadMap(m_mapToLoad)) {
         std::cout << "Failed to load map!" << std::endl;
         return false;
     }
+    std::cout << "Creating map texture..." << std::endl;
     createMapTexture();
 
     if (!TextureManager::getInstance()->load("assets/player.png", m_playerID, Game::getInstance()->getRenderer())) {
@@ -46,18 +49,21 @@ bool SceneGame::onEnter() {
     std::cout << "Successfully loaded bullet texture!" << std::endl;
     
     const std::vector<SpawnPoint>& spawns = m_mapLoader->getSpawnPoints();
-    
-    float startX = 100.0f;
-    float startY = 50.0f;
-    float startOrient = 0;
 
-    if (!spawns.empty()) {
-        startX = spawns[0].x;
-        startY = spawns[0].y;
+    for (int i = 0; i < 2; i++) {
+        Player* newPlayer = new Player(i, "Player" + std::to_string(i + 1), spawns[i].x, spawns[i].y, (i % 2 == 0));
+        m_players.push_back(newPlayer);
+        if (i == 0) {
+            m_player = newPlayer; // Local player is the first one
+        }
     }
 
-    m_player = new Player(1, "Player1", startX, startY, startOrient);
-    m_players.push_back(m_player);
+    if (m_gameRoom) {
+        delete m_gameRoom;
+        m_gameRoom = nullptr;
+    }
+    m_gameRoom = new GameRoom(m_players);
+    m_gameRoom->startGame();
 
     return true;
 }
@@ -84,23 +90,44 @@ bool SceneGame::onExit() {
         delete m_physics;
         m_physics = nullptr;
     }
+
+    if (m_gameRoom) {
+        delete m_gameRoom;
+        m_gameRoom = nullptr;
+    }
     
     if (m_font) {
         TTF_CloseFont(m_font);
         m_font = nullptr;
     }
     
+    for (auto* p : m_players) {
+        delete p;
+    }
     m_players.clear();
 
     return true;
 }
 
 void SceneGame::update() {
+    // Real-time delta (seconds)
+    Uint32 now = SDL_GetTicks();
+    float dt = (m_lastTick == 0) ? 0.0f : (float)(now - m_lastTick) / 1000.0f;
+    m_lastTick = now;
+    if (dt < 0.0f) dt = 0.0f;
+    if (dt > 0.1f) dt = 0.1f; // clamp to avoid huge jumps on pauses
+
+    // The physics/gameplay code in this project was tuned with a fixed step.
+    // Use real dt for timers, but keep physics step consistent to avoid slow-motion.
+    const float physicsDt = 0.5f;
+
     if (InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_ESCAPE)) {
         Game::getInstance()->quit();
     }
 
-    if (m_player && m_player->isAlive()) {
+    const bool isPlayingTurn = (m_gameRoom && m_gameRoom->getState() == PLAYING_TURN);
+
+    if (m_player && m_player->isAlive() && m_player->isMyTurn() && isPlayingTurn) {
         bool isMoving = false;
 
         // Move Left
@@ -136,31 +163,50 @@ void SceneGame::update() {
             m_player->m_angle = 180.0f;
         }
 
-        // --- 3. FIRING (Spacebar) ---
-        // Hold space to charge power, release to fire
-        static bool wasSpacePressed = false;
+        // --- 3. POWER CHARGE (Spacebar) ---
+        // Hold space to charge power; firing happens only on ENTER or timeout.
         bool isSpacePressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_SPACE);
-
         if (isSpacePressed) {
-            // Increase power while space is held
-            m_player->m_power += 1.0f;
+            m_player->m_power += 60.0f * dt;
             if (m_player->m_power > 100) m_player->m_power = 100;
-        } else if (wasSpacePressed && m_player->m_power > 0) {
-            // Fire when space is released
-            std::cout << "Firing! Angle: " << m_player->m_angle << " Power: " << m_player->m_power << std::endl;
-            m_physics->fireProjectile(m_player, m_projectiles);
-            m_player->m_power = 0;  // Reset power after firing
         }
-        
-        wasSpacePressed = isSpacePressed;
+
+        // --- 4. CONFIRM (Enter) ---
+        static bool wasEnterPressed = false;
+        bool isEnterPressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_RETURN);
+        if (isEnterPressed && !wasEnterPressed) {
+            m_gameRoom->commitShot();
+        }
+        wasEnterPressed = isEnterPressed;
     }
 
-    m_physics->update(delta_time, m_players, m_projectiles, m_mapLoader);
+    // If a shot was committed (ENTER or timeout), perform it exactly once.
+    if (m_gameRoom) {
+        if (Player* shooter = m_gameRoom->takePendingShooter()) {
+            m_physics->fireProjectile(shooter, m_projectiles);
+            shooter->m_power = 0.0f;
+            m_gameRoom->notifyShotFired();
+        }
+    }
+
+    m_physics->update(physicsDt, m_players, m_projectiles, m_mapLoader);
     
     // Check if terrain was modified by an explosion
     if (m_physics->hasTerrainBeenModified()) {
         m_mapModified = true;
         m_physics->resetTerrainModifiedFlag();
+    }
+
+    if (m_gameRoom) {
+        m_gameRoom->update(dt, m_projectiles);
+
+        // If the timer expired this frame, commitShot() happens inside GameRoom::update().
+        // Fire it now (projectile will update starting next frame).
+        if (Player* shooter = m_gameRoom->takePendingShooter()) {
+            m_physics->fireProjectile(shooter, m_projectiles);
+            shooter->m_power = 0.0f;
+            m_gameRoom->notifyShotFired();
+        }
     }
 }
 
@@ -200,10 +246,7 @@ void SceneGame::render() {
                 flip
             );
             
-            // Render health bar above player
-            if (player == m_player) {
-                renderHealthBar(pos);
-            }
+            renderHealthBar(pos, player);
         }
     }
 
@@ -249,6 +292,25 @@ void SceneGame::render() {
             }
             SDL_FreeSurface(powerSurface);
         }
+
+        // Render Turn Timer
+        if (m_gameRoom) {
+            float timeLeft = m_gameRoom->getTurnTimer();
+            if (timeLeft < 0.0f) timeLeft = 0.0f;
+            int secondsLeft = (int)(timeLeft + 0.999f);
+
+            std::string timerText = "Time " + std::to_string(secondsLeft);
+            SDL_Surface* timerSurface = TTF_RenderText_Solid(m_font, timerText.c_str(), textColor);
+            if (timerSurface) {
+                SDL_Texture* timerTexture = SDL_CreateTextureFromSurface(renderer, timerSurface);
+                if (timerTexture) {
+                    SDL_Rect timerRect = {10, 70, timerSurface->w, timerSurface->h};
+                    SDL_RenderCopy(renderer, timerTexture, NULL, &timerRect);
+                    SDL_DestroyTexture(timerTexture);
+                }
+                SDL_FreeSurface(timerSurface);
+            }
+        }
     }
 }
 
@@ -273,22 +335,19 @@ void SceneGame::createMapTexture() {
     SDL_SetTextureBlendMode(m_mapTexture, SDL_BLENDMODE_BLEND); 
 
     // 2. Lock and Write Pixels
-    void* pixels;
-    int pitch;
-    SDL_LockTexture(m_mapTexture, NULL, &pixels, &pitch);
-
-    Uint32* pixelBuffer = (Uint32*)pixels;
+    void* pixels = nullptr;
+    int pitch = 0;
+    if (SDL_LockTexture(m_mapTexture, NULL, &pixels, &pitch) != 0 || !pixels) {
+        std::cerr << "Failed to lock map texture: " << SDL_GetError() << std::endl;
+        return;
+    }
 
     for (int y = 0; y < height; y++) {
+        auto* row = reinterpret_cast<Uint32*>(reinterpret_cast<Uint8*>(pixels) + y * pitch);
         for (int x = 0; x < width; x++) {
-            int index = y * width + x;
-            
-            if (m_mapLoader->isSolid(x, y)) {
-                pixelBuffer[index] = 0x3C280DFF; // Brown color for Solid
-            } else {
-                // Draw Air (Transparent)
-                pixelBuffer[index] = 0x00000000; 
-            }
+            row[x] = m_mapLoader->isSolid((float)x, (float)y)
+                ? 0x3C280DFF  // Solid (brown)
+                : 0x00000000; // Air (transparent)
         }
     }
 
@@ -302,35 +361,30 @@ void SceneGame::updateMapTexture() {
     int height = m_mapLoader->getHeight();
 
     // Lock and update pixels
-    void* pixels;
-    int pitch;
-    SDL_LockTexture(m_mapTexture, NULL, &pixels, &pitch);
-
-    Uint32* pixelBuffer = (Uint32*)pixels;
+    void* pixels = nullptr;
+    int pitch = 0;
+    if (SDL_LockTexture(m_mapTexture, NULL, &pixels, &pitch) != 0 || !pixels) {
+        std::cerr << "Failed to lock map texture: " << SDL_GetError() << std::endl;
+        return;
+    }
 
     for (int y = 0; y < height; y++) {
+        auto* row = reinterpret_cast<Uint32*>(reinterpret_cast<Uint8*>(pixels) + y * pitch);
         for (int x = 0; x < width; x++) {
-            int index = y * width + x;
-            
-            if (m_mapLoader->isSolid(x, y)) {
-                pixelBuffer[index] = 0x3C280DFF; // Brown color for Solid
-            } else {
-                // Draw Air (Transparent)
-                pixelBuffer[index] = 0x00000000; 
-            }
+            row[x] = m_mapLoader->isSolid((float)x, (float)y)
+                ? 0x3C280DFF
+                : 0x00000000;
         }
     }
 
     SDL_UnlockTexture(m_mapTexture);
 }
 
-void SceneGame::renderHealthBar(Position playerPos) {
-    if (!m_player) return;
-
+void SceneGame::renderHealthBar(Position playerPos, Player* player) {
     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
     
     // Poll current health from player
-    int currentHealth = m_player->getHP();
+    int currentHealth = player->getHP();
     int maxHealth = 100;
     
     // Health bar dimensions and position (above player)

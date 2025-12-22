@@ -3,6 +3,9 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
+#include <cmath>
 
 struct SpawnPoint {
     float x, y;
@@ -33,8 +36,32 @@ public:
 
         file.close();
 
-        m_spawnPoints.push_back({200.0f, 100.0f});
-        m_spawnPoints.push_back({1000.0f, 100.0f});
+        // Generate 2 random spawn X coordinates with a minimum separation.
+        static bool seeded = false;
+        if (!seeded) {
+            std::srand((unsigned)std::time(nullptr));
+            seeded = true;
+        }
+
+        m_spawnPoints.clear();
+
+        const float minSeparation = 600.0f;
+        const float maxX = (m_width > 0) ? (float)(m_width - 1) : 0.0f;
+
+        auto randomX = [&]() -> float {
+            if (maxX <= 0.0f) return 0.0f;
+            return (float)std::rand() / (float)RAND_MAX * maxX;
+        };
+
+        float spawnX_1 = randomX();
+        float spawnX_2 = randomX();
+        int attempts = 0;
+        while (std::fabs(spawnX_1 - spawnX_2) < minSeparation && attempts++ < 2000) {
+            spawnX_2 = randomX();
+        }
+
+        m_spawnPoints.push_back({spawnX_1, 100.0f});
+        m_spawnPoints.push_back({spawnX_2, 100.0f});
         
         return true;
     }

@@ -4,8 +4,9 @@
 #include "MapLoader.hpp"
 #include <vector>
 #include <iostream>
+#include <string>
 
-#define TIMER 30.0f
+#define TIMER 10.0f
 
 enum RoomState {
     WAITING_FOR_PLAYERS,
@@ -23,6 +24,8 @@ private:
     int m_currentTurnIndex;
     float m_turnTimer;
     MapLoader* m_mapLoader;
+    Player* m_pendingShooter;
+    bool m_waitingForShot;
     void switchTurn() {
         m_players[m_currentTurnIndex]->setTurn(false);
         m_players[m_currentTurnIndex]->stopMoving();
@@ -33,8 +36,18 @@ private:
 
         m_players[m_currentTurnIndex]->setTurn(true);
         m_turnTimer = TIMER;
+        m_state = PLAYING_TURN;
+        m_pendingShooter = nullptr;
+        m_waitingForShot = false;
 
         m_physics->setWind((rand() % 20) - 10.0f);
+    }
+
+    bool hasActiveProjectile(const std::vector<Projectile>& projectiles) const {
+        for (const auto& p : projectiles) {
+            if (p.isActive) return true;
+        }
+        return false;
     }
 
     void checkWinCondition() {
@@ -53,7 +66,14 @@ private:
     }
 
 public:
-    GameRoom() : m_state(WAITING_FOR_PLAYERS), m_currentTurnIndex(0), m_turnTimer(0.0f) {
+    GameRoom(const std::vector<Player*>& players)
+        : m_state(WAITING_FOR_PLAYERS),
+          m_currentTurnIndex(0),
+          m_turnTimer(0.0f),
+          m_mapLoader(nullptr),
+          m_pendingShooter(nullptr),
+          m_waitingForShot(false),
+          m_players(players) {
         m_physics = new PhysicsEngine();
     }
 
@@ -69,32 +89,67 @@ public:
             m_state = PLAYING_TURN;
             m_currentTurnIndex = 0;
             m_players[0]->setTurn(true);
+            m_turnTimer = TIMER;
+            m_pendingShooter = nullptr;
+            m_waitingForShot = false;
             std::cout << "Game Started! Player " << m_players[0]->getId() << "'s turn." << std::endl;
         }
     }
 
-    void update(float deltaTime) {
-        // Physics update
-        m_physics->update(deltaTime, m_players, m_projectiles, m_mapLoader);
+    float getTurnTimer() const { return m_turnTimer; }
 
-        // Game logic
+    RoomState getState() const { return m_state; }
+
+    Player* getCurrentPlayer() const {
+        if (m_players.empty()) return nullptr;
+        return m_players[m_currentTurnIndex];
+    }
+
+    // Commit the shot for the current turn (ENTER or timeout). Returns true only once.
+    bool commitShot() {
+        if (m_state != PLAYING_TURN) return false;
+        Player* shooter = getCurrentPlayer();
+        if (!shooter || !shooter->isAlive()) return false;
+        m_state = FIRING_PHASE;
+        m_pendingShooter = shooter;
+        m_waitingForShot = true;
+        return true;
+    }
+
+    // Scene consumes this once to perform the actual PhysicsEngine::fireProjectile.
+    Player* takePendingShooter() {
+        Player* result = m_pendingShooter;
+        m_pendingShooter = nullptr;
+        return result;
+    }
+
+    // Scene calls this right after firing to allow the room to wait for projectile settle.
+    void notifyShotFired() { m_waitingForShot = false; }
+
+    // Update using Scene-owned projectile list (recommended for the current client architecture).
+    void update(float deltaTime, const std::vector<Projectile>& externalProjectiles) {
         if (m_state == PLAYING_TURN) {
             m_turnTimer -= deltaTime;
-            if (m_turnTimer <= 0) { // 30 seconds per turn
-                switchTurn();
+            if (m_turnTimer <= 0.0f) {
+                commitShot();
             }
-        } else if (m_state = FIRING_PHASE) {
-            // Wait for projectile to settle
-            bool activeProjectiles = false;
-            for (const auto& p : m_projectiles) {
-                if (p.isActive) activeProjectiles = true;
-            }
+            return;
+        }
 
-            if (!activeProjectiles) {
+        if (m_state == FIRING_PHASE) {
+            // Ensure the shot happens exactly once before we start waiting.
+            if (m_waitingForShot) return;
+
+            if (!hasActiveProjectile(externalProjectiles)) {
                 checkWinCondition();
                 switchTurn();
             }
         }
+    }
+
+    // Backward-compatible update for existing code paths.
+    void update(float deltaTime) {
+        update(deltaTime, m_projectiles);
     }
 
     void handleInput(int playerId, std::string command, float value = 0.0f) {

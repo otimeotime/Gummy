@@ -100,7 +100,7 @@ public:
             for (auto p : players) {
                 if (p->isAlive()) {
                     if (checkCollision(proj, p)) {
-                        std::cerr << "Player" << p->getId() << "took damage" << std::endl;
+                        std::cerr << "Player " << p->getId() << " took damage" << std::endl;
                         proj.isActive = false;
                         p->takeDamage(10); // Deal 10 damage on hit
                         break;
@@ -132,5 +132,6 @@ public:
 
     void setWind(float wind) {
         WIND = wind;
+        std::cout << "Wind set to: " << WIND << std::endl;
     }
 };
