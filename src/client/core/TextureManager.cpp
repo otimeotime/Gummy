@@ -55,3 +55,28 @@ void TextureManager::drawFrame(std::string id, int x, int y, int width, int heig
 void TextureManager::clearFromTextureMap(std::string id) {
     textureMap.erase(id);
 }
+
+void TextureManager::drawScaled(std::string id, int x, int y, int width, int height, SDL_Renderer* renderer, double angle, SDL_RendererFlip flip) {
+    SDL_Rect srcRect;
+    SDL_Rect destRect;
+
+    // Check if texture exists to avoid crash
+    if (textureMap.find(id) == textureMap.end() || textureMap[id] == nullptr) {
+        // Texture missing, do nothing
+        return;
+    }
+
+    // 1. Get the real size of the image (e.g., 500x500)
+    SDL_QueryTexture(textureMap[id], NULL, NULL, &srcRect.w, &srcRect.h);
+    srcRect.x = 0;
+    srcRect.y = 0;
+
+    // 2. Define where to draw it (e.g., 16x16)
+    destRect.x = x;
+    destRect.y = y;
+    destRect.w = width;
+    destRect.h = height;
+
+    // 3. Render
+    SDL_RenderCopyEx(renderer, textureMap[id], &srcRect, &destRect, angle, 0, flip);
+}

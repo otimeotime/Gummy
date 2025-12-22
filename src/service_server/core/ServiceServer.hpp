@@ -9,7 +9,7 @@
 
 class ServiceServer {
 private:
-    TCPSocket mServerSocket;
+    TCPSocket mServiceServerSocket;
     std::atomic<bool> mIsRunning;
     
     AuthServer mAuthServer;
