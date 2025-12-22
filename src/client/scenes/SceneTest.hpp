@@ -1,42 +1,64 @@
 #pragma once
 #include "../core/GameState.hpp"
-#include "../core/Game.hpp"
-#include "../core/TextureManager.hpp"
-#include "../core/InputHandler.hpp"
+#include "../ui/Text.hpp"
+#include "../ui/TextInput.hpp"
+#include "../ui/Button.hpp"
+#include <vector>
+#include <iostream>
 
 class SceneTest : public GameState {
 public:
-    std::string textureID = "bg_test";
+    // Polymorphism: Manage all UI elements in one list
+    std::vector<UIObject*> m_uiObjects; 
 
     virtual bool onEnter() override {
-        std::cout << "Entering Test Scene..." << std::endl;
-        if (!TextureManager::getInstance()->load("assets/Mario.png", textureID, Game::getInstance()->getRenderer())) {
-            std::cout << "Failed to load image!" << std::endl;
-            return false;
-        }
-        return true;
-    }
+        std::cout << "[SceneTest] Entering..." << std::endl;
 
-    virtual bool onExit() override {
-        std::cout << "Exiting Test Scene..." << std::endl;
-        TextureManager::getInstance()->clearFromTextureMap(textureID);
+        // 1. Add a Static Label (Text)
+        // Position: (300, 150), Font size: 24, Color: Red
+        Text* lblName = new Text(300, 150, "assets/Arial.ttf", 24, "Enter Username:", {255, 0, 0, 255});
+        m_uiObjects.push_back(lblName);
+
+        // 2. Add an Input Field (TextInput)
+        // Position: (300, 200), Width: 250, Height: 40
+        TextInput* inputName = new TextInput(300, 200, 250, 40, "assets/Arial.ttf", 20);
+        m_uiObjects.push_back(inputName);
+
+        // 3. Add a Submit Button (Using your Button class)
+        // Position: (300, 260)
+        Button* btnSubmit = new Button(300, 260, 100, 50, "btn_submit", [inputName]() {
+            // Callback: Print the text when button is clicked
+            std::cout << "User typed: " << inputName->getString() << std::endl;
+        });
+        m_uiObjects.push_back(btnSubmit);
+
         return true;
     }
 
     virtual void update() override {
-        if (InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_ESCAPE)) {
-            Game::getInstance()->quit();
+        // Update all objects in one loop
+        for (auto obj : m_uiObjects) {
+            obj->update();
         }
     }
 
     virtual void render() override {
+        // Render all objects in one loop
+        for (auto obj : m_uiObjects) {
+            obj->draw();
+        }
+    }
+
+    virtual bool onExit() override {
+        std::cout << "[SceneTest] Exiting..." << std::endl;
         
-        TextureManager::getInstance()->drawStatic(
-            textureID, 
-            0, 0, 
-            800, 600,
-            Game::getInstance()->getRenderer()
-        );
+        // Clean up memory
+        for (auto obj : m_uiObjects) {
+            obj->clean();
+            delete obj;
+        }
+        m_uiObjects.clear();
+        return true;
     }
 
     virtual std::string getStateID() const override { return "TEST_SCENE"; }

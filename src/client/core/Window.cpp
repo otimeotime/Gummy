@@ -31,11 +31,19 @@ bool Window::init(const char* title, int xpos, int ypos, int width, int height, 
             return false;
         }
 
+        // init SDL image
         int imgFlags = IMG_INIT_JPG | IMG_INIT_PNG;
         if (!(IMG_Init(imgFlags) & imgFlags)) {
             std::cerr << "SDL_image could not initialize! SDL_image Error: " << IMG_GetError() << std::endl;
             return false;
         }
+
+        // init SDL font ttf
+        if (TTF_Init() == -1) {
+            std::cout << "SDL_ttf could not initialize! Error: " << TTF_GetError() << std::endl;
+            return false;
+        }
+        SDL_StartTextInput();
 
         running = true;
     } else {
@@ -66,6 +74,7 @@ void Window::handleEvents() {
 }
 
 void Window::clear() {
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderClear(renderer);
 }
 
@@ -74,16 +83,12 @@ void Window::display() {
 }
 
 void Window::clean() {
-    if (renderer) {
-        SDL_DestroyRenderer(renderer);
-        renderer = nullptr;
-    }
-    if (window) {
-        SDL_DestroyWindow(window);
-        window = nullptr;
-    }
 
-    IMG_Quit();
+    SDL_StopTextInput();
+    TTF_Quit();
+
+    SDL_DestroyWindow(window);
+    SDL_DestroyRenderer(renderer);
     SDL_Quit();
     std::cout << "Game Cleaned" << std::endl;
 }

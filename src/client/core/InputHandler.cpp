@@ -6,6 +6,9 @@ InputHandler::InputHandler() {
     for(int i = 0; i < 3; i++) {
         mouseButtonStates.push_back(false);
     }
+
+    m_inputText = "";
+    m_isBackspace = false;
 }
 
 InputHandler::~InputHandler() {
@@ -15,6 +18,8 @@ InputHandler::~InputHandler() {
 void InputHandler::update() {
     // Update Keyboard state array
     keystates = SDL_GetKeyboardState(0);
+    // Reset enter string per frame
+    m_inputText = "";
 }
 
 void InputHandler::updateEvent(SDL_Event& event) {
@@ -46,6 +51,23 @@ void InputHandler::updateEvent(SDL_Event& event) {
     if(event.type == SDL_MOUSEMOTION) {
         mousePosition->x = (float)event.motion.x;
         mousePosition->y = (float)event.motion.y;
+    }
+
+    // Update Keyboard Events
+    if (event.type == SDL_TEXTINPUT) {
+        m_inputText = event.text.text;
+    }
+
+    if (event.type == SDL_KEYDOWN) {
+        if (event.key.keysym.sym == SDLK_BACKSPACE) {
+            m_isBackspace = true;
+        }
+    }
+    
+    if (event.type == SDL_KEYUP) {
+        if (event.key.keysym.sym == SDLK_BACKSPACE) {
+            m_isBackspace = false;
+        }
     }
 }
 
