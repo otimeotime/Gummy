@@ -28,11 +28,15 @@ public:
     // Get Mouse position
     Vector2D* getMousePosition() { return mousePosition; }
 
-    // Mouse button states
+    // Mouse button states (Held Down)
     bool getMouseButtonState(int buttonNumber); 
+
+    // Mouse button clicked (Just Pressed this frame)
+    bool getMouseButtonClicked(int buttonNumber);
 
     // Reset states (if needed)
     void clean();
+    void reset();
 
     // Get characters typed in the current frame
     std::string getInputText() { return m_inputText; }
@@ -46,6 +50,7 @@ private:
 
     const Uint8* keystates;
     std::vector<bool> mouseButtonStates;
+    std::vector<bool> mouseButtonJustPressed;
     Vector2D* mousePosition;
 
     std::string m_inputText = "";

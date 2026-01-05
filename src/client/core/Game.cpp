@@ -1,7 +1,8 @@
 #include "Game.hpp"
+#include "../network/ClientSocket.hpp"
 #include <iostream>
 
-Game::Game() : m_pWindow(nullptr), m_pStateMachine(nullptr), m_bRunning(false) {}
+Game::Game() : m_pWindow(nullptr), m_pStateMachine(nullptr), m_pClientSocket(nullptr), m_bRunning(false) {}
 
 bool Game::init(const char* title, int width, int height) {
     // 1. Initialize SDL_ttf
@@ -20,7 +21,10 @@ bool Game::init(const char* title, int width, int height) {
     // 3. Initialize State Machine
     m_pStateMachine = new StateMachine();
 
-    // 4. Mark game as running
+    // 4. Initialize Network Socket
+    m_pClientSocket = new ClientSocket();
+
+    // 5. Mark game as running
     m_bRunning = true;
     std::cout << "Game Engine Initialized Successfully." << std::endl;
     return true;
@@ -60,6 +64,12 @@ void Game::clean() {
     // Clean States
     m_pStateMachine->clean();
     delete m_pStateMachine;
+
+    // Clean Network
+    if (m_pClientSocket) {
+        delete m_pClientSocket;
+        m_pClientSocket = nullptr;
+    }
 
     // Clean Window
     m_pWindow->clean();

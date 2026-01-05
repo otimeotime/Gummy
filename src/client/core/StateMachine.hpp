@@ -24,4 +24,7 @@ public:
 
 private:
     std::vector<GameState*> m_gameStates;
+    GameState* m_pendingState = nullptr;
+    bool m_isChanging = false;
+    bool m_isPopping = false;
 };

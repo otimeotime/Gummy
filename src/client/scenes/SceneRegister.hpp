@@ -7,25 +7,21 @@
 #include <vector>
 #include <string>
 
-class SceneLogin : public GameState {
+class SceneRegister : public GameState {
 public:
-    SceneLogin(std::string message = "");
-
     virtual bool onEnter() override;
     virtual bool onExit() override;
     virtual void update() override;
     virtual void render() override;
-    virtual std::string getStateID() const override { return "SCENE_LOGIN"; }
+    virtual std::string getStateID() const override { return "SCENE_REGISTER"; }
 
 private:
-    // List to manage all UI elements (Inputs, Buttons, Labels)
     std::vector<UIObject*> m_uiObjects;
-
-    // Specific pointers to inputs if we need to access their text later (for validation)
-    TextInput* m_inputUsername = nullptr;
-    TextInput* m_inputPassword = nullptr;
+    
+    TextInput* m_inputUsername;
+    TextInput* m_inputPassword;
+    TextInput* m_inputConfirmPassword;
     Text* m_lblError = nullptr;
 
-    std::string m_initMessage;
     std::string m_bannerTextureID;
 };

@@ -52,6 +52,29 @@ void TextureManager::drawFrame(std::string id, int x, int y, int width, int heig
     SDL_RenderCopyEx(renderer, textureMap[id], &srcRect, &destRect, angle, 0, flip);
 }
 
+void TextureManager::drawFrameScaled(std::string id, int srcW, int srcH, int destX, int destY, int destW, int destH, int currentRow, int currentFrame, SDL_Renderer* renderer, double angle, int alpha, SDL_RendererFlip flip) {
+    SDL_Rect srcRect;
+    SDL_Rect destRect;
+
+    // Calculate position in sprite sheet using SOURCE dimensions
+    srcRect.x = srcW * currentFrame;
+    srcRect.y = srcH * (currentRow - 1);
+    srcRect.w = srcW;
+    srcRect.h = srcH;
+
+    // Destination on screen
+    destRect.x = destX;
+    destRect.y = destY;
+    destRect.w = destW;
+    destRect.h = destH;
+
+    // Set opacity if needed
+    SDL_SetTextureAlphaMod(textureMap[id], alpha);
+
+    // Render
+    SDL_RenderCopyEx(renderer, textureMap[id], &srcRect, &destRect, angle, 0, flip);
+}
+
 void TextureManager::clearFromTextureMap(std::string id) {
     textureMap.erase(id);
 }

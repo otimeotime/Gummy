@@ -24,6 +24,9 @@ public:
     // center: pivot point (nullptr = center of image)
     void drawFrame(std::string id, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* renderer, double angle, int alpha = 255, SDL_RendererFlip flip = SDL_FLIP_NONE);
 
+    // Draw a frame with scaling (Source Size != Dest Size)
+    void drawFrameScaled(std::string id, int srcW, int srcH, int destX, int destY, int destW, int destH, int currentRow, int currentFrame, SDL_Renderer* renderer, double angle = 0, int alpha = 255, SDL_RendererFlip flip = SDL_FLIP_NONE);
+
     // Remove texture from memory
     void clearFromTextureMap(std::string id);
 

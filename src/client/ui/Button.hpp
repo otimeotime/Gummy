@@ -8,7 +8,9 @@ using Callback = std::function<void()>;
 class Button : public UIObject {
 public:
     // Constructor
-    Button(float x, float y, int width, int height, std::string textureID, Callback callback);
+    // width, height: Destination size (on screen)
+    // srcWidth, srcHeight: Source size (in sprite sheet). Defaults to 0 (same as dest)
+    Button(float x, float y, int width, int height, std::string textureID, Callback callback, int srcWidth = 0, int srcHeight = 0);
 
     // Override methods from UIObject
     virtual void load() override;
@@ -29,4 +31,7 @@ private:
     
     int m_currentFrame; 
     bool m_bReleased; // To prevent rapid-fire clicking
+
+    int m_srcWidth;
+    int m_srcHeight;
 };

@@ -1,7 +1,7 @@
 -- 1. Create the User table
 CREATE TABLE "User" (
     user_id BIGSERIAL PRIMARY KEY,
-    username VARCHAR(32) NOT NULL,
+    username VARCHAR(32) NOT NULL UNIQUE,
     password VARCHAR(256) NOT NULL,
     info TEXT,
     created_at TIMESTAMP DEFAULT NOW()

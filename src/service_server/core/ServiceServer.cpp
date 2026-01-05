@@ -71,12 +71,17 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
 
         std::vector<char> payloadBuffer(header.length);
         if (header.length > 0) {
-            bytesRead = clientSocket->Receive(payloadBuffer.data(), payloadBuffer.size());
-            if (bytesRead <= 0) {
-                std::cerr << "Thread Client disconnected or error occurred while reading payload." << std::endl;
-                connected = false;
-                break;
+            size_t totalReceived = 0;
+            while (totalReceived < header.length) {
+                int received = clientSocket->Receive(payloadBuffer.data() + totalReceived, header.length - totalReceived);
+                if (received <= 0) {
+                    std::cerr << "Thread Client disconnected or error occurred while reading payload." << std::endl;
+                    connected = false;
+                    break;
+                }
+                totalReceived += received;
             }
+            if (!connected) break;
         }
 
         Packet packet;
@@ -86,21 +91,20 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
         switch (header.type) {
             // User try to LOGIN or REGISTER -------------------------------------------------------------------------------------------------------------
             case PacketType::REQ_AUTHENTICATE: {
-                ReqAuthenticate req = packet.GetPayload<ReqAuthenticate>();
+                ReqAuthenticate req = packet.GetPayload<ReqAuthenticate>();                
                 UserData outUser;
                 ResAuthenticate res;
                 if (req.isLogin) {
                     if (mAuthServer.login(req.username, req.password, outUser)) {
                         res.isLogin = true;
                         res.isSuccess = true;
-                        strcpy(res.message, "Login successful.");
                         std::snprintf(res.message, sizeof(res.message), "Login successful. Welcome, %s!", outUser.username.c_str());
                     } else {
                         res.isLogin = true;
                         res.isSuccess = false;
                         std::snprintf(res.message, sizeof(res.message), "Login failed. Invalid credentials.");     
                     }
-                    PacketUtils::SendPacket(clientSocket, PacketType::RES_AUTHENTICATE, res);
+                    // PacketUtils::SendPacket(clientSocket, PacketType::RES_AUTHENTICATE, res); // REMOVED DUPLICATE SEND
                 } else {
                     long outUserId;
                     if (mAuthServer.reg(req.username, req.password, outUserId)) {

@@ -32,6 +32,9 @@ public:
     // Accessors
     StateMachine* getStateMachine() { return m_pStateMachine; }
     SDL_Renderer* getRenderer() const { return Window::renderer; }
+    
+    // Network Accessor (Forward declared)
+    class ClientSocket* getClientSocket() { return m_pClientSocket; }
 
 private:
     Game();
@@ -43,5 +46,6 @@ private:
 
     Window* m_pWindow;
     StateMachine* m_pStateMachine;
+    class ClientSocket* m_pClientSocket;
     bool m_bRunning;
 };

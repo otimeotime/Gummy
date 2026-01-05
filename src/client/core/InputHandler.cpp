@@ -5,6 +5,7 @@ InputHandler::InputHandler() {
     // Initialize mouse buttons (Left, Middle, Right)
     for(int i = 0; i < 3; i++) {
         mouseButtonStates.push_back(false);
+        mouseButtonJustPressed.push_back(false);
     }
 
     m_inputText = "";
@@ -20,6 +21,11 @@ void InputHandler::update() {
     keystates = SDL_GetKeyboardState(0);
     // Reset enter string per frame
     m_inputText = "";
+    
+    // Reset click states
+    for(int i = 0; i < 3; i++) {
+        mouseButtonJustPressed[i] = false;
+    }
 }
 
 void InputHandler::updateEvent(SDL_Event& event) {
@@ -27,12 +33,15 @@ void InputHandler::updateEvent(SDL_Event& event) {
     if(event.type == SDL_MOUSEBUTTONDOWN) {
         if(event.button.button == SDL_BUTTON_LEFT) {
             mouseButtonStates[0] = true;
+            mouseButtonJustPressed[0] = true;
         }
         if(event.button.button == SDL_BUTTON_MIDDLE) {
             mouseButtonStates[1] = true;
+            mouseButtonJustPressed[1] = true;
         }
         if(event.button.button == SDL_BUTTON_RIGHT) {
             mouseButtonStates[2] = true;
+            mouseButtonJustPressed[2] = true;
         }
     }
 
@@ -84,6 +93,19 @@ bool InputHandler::getMouseButtonState(int buttonNumber) {
     return mouseButtonStates[buttonNumber];
 }
 
+bool InputHandler::getMouseButtonClicked(int buttonNumber) {
+    return mouseButtonJustPressed[buttonNumber];
+}
+
 void InputHandler::clean() {
     // Cleanup if necessary
+}
+
+void InputHandler::reset() {
+    for(int i = 0; i < 3; i++) {
+        mouseButtonStates[i] = false;
+        mouseButtonJustPressed[i] = false;
+    }
+    m_inputText = "";
+    m_isBackspace = false;
 }

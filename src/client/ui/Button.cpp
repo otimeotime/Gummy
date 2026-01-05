@@ -3,11 +3,15 @@
 #include "../core/TextureManager.hpp"
 #include "../core/Game.hpp"          
 
-Button::Button(float x, float y, int width, int height, std::string textureID, Callback callback)
+Button::Button(float x, float y, int width, int height, std::string textureID, Callback callback, int srcWidth, int srcHeight)
     : UIObject(x, y, width, height), m_textureID(textureID), m_callback(callback) 
 {
     m_currentFrame = MOUSE_OUT; // Default state
     m_bReleased = true;
+    
+    // If src dimensions are not provided (0), assume they match destination
+    m_srcWidth = (srcWidth > 0) ? srcWidth : width;
+    m_srcHeight = (srcHeight > 0) ? srcHeight : height;
 }
 
 void Button::load() {
@@ -16,12 +20,15 @@ void Button::load() {
 
 void Button::draw() {
     // Sprite Sheet Size: 1x3
-    TextureManager::getInstance()->drawFrame(
+    // Use drawFrameScaled to support resizing
+    TextureManager::getInstance()->drawFrameScaled(
         m_textureID, 
+        m_srcWidth,     // Source Width (e.g. 181)
+        m_srcHeight,    // Source Height (e.g. 73)
         (int)m_position.x, 
         (int)m_position.y, 
-        m_width, 
-        m_height, 
+        m_width,        // Dest Width (e.g. 120)
+        m_height,       // Dest Height (e.g. 50)
         1,              // Row 1
         m_currentFrame, // Frame index (0, 1, or 2)
         Game::getInstance()->getRenderer(),
