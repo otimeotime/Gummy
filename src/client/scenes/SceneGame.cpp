@@ -1,6 +1,7 @@
 #include "SceneGame.hpp"
 
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 
@@ -422,9 +423,48 @@ void SceneGame::render() {
                 SDL_FreeSurface(surface);
             };
 
-            drawText("Angle " + std::to_string(angleInt), 10, 10);
-            drawText("Power " + std::to_string(powerInt), 10, 40);
-            drawText("Time " + std::to_string(secondsLeft), 10, 70);
+            // 1) Local-only angle indicator: red line + angle label at the tip.
+            {
+                constexpr float kPi = 3.14159265358979323846f;
+                const float rad = me.angle * (kPi / 180.0f);
+                const float directionMult = (me.orient != 0) ? 1.0f : -1.0f;
+                const float lineLen = 70.0f;
+
+                const int startX = (int)me.x + 16;
+                const int startY = (int)me.y + 16;
+                const int tipX = startX + (int)(std::cos(rad) * lineLen * directionMult);
+                const int tipY = startY + (int)(-std::sin(rad) * lineLen);
+
+                SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+                SDL_RenderDrawLine(renderer, startX, startY, tipX, tipY);
+
+                // Move the angle numeric value from top-left to the tip of the red line.
+                drawText(std::to_string(angleInt), tipX + 6, tipY - 10);
+            }
+
+            // 2) Local-only power indicator: yellow bar at top-left + numeric value.
+            {
+                const int barX = 10;
+                const int barY = 10;
+                const int barW = 180;
+                const int barH = 12;
+                const float ratio = (powerInt <= 0) ? 0.0f : (powerInt >= 100 ? 1.0f : (powerInt / 100.0f));
+                const int fillW = (int)(barW * ratio);
+
+                SDL_Rect bg{barX, barY, barW, barH};
+                SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
+                SDL_RenderFillRect(renderer, &bg);
+
+                SDL_Rect fill{barX, barY, fillW, barH};
+                SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+                SDL_RenderFillRect(renderer, &fill);
+
+                SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
+                SDL_RenderDrawRect(renderer, &bg);
+
+                drawText("Power " + std::to_string(powerInt), barX, barY + barH + 6);
+                drawText("Time " + std::to_string(secondsLeft), barX, barY + barH + 32);
+            }
         }
     }
 }
