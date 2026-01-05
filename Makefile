@@ -24,7 +24,7 @@ CLIENT_SRCS := \
 	src/client/core/TextureManager.cpp \
 	src/client/core/Window.cpp \
 	src/client/network/ClientSocket.cpp \
-	src/client/scenes/SceneGameNet.cpp \
+	src/client/scenes/SceneGame.cpp \
 	src/client/ui/Button.cpp \
 	src/client/ui/Text.cpp \
 	src/client/ui/TextInput.cpp \

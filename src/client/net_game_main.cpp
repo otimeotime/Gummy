@@ -1,5 +1,5 @@
 #include "core/Game.hpp"
-#include "scenes/SceneGameNet.hpp"
+#include "scenes/SceneGame.hpp"
 
 #include <cstdlib>
 #include <string>
@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    Game::getInstance()->getStateMachine()->pushState(new SceneGameNet(ip, port));
+    Game::getInstance()->getStateMachine()->pushState(new SceneGame(ip, port));
 
     Uint32 frameStart, frameTime;
 
