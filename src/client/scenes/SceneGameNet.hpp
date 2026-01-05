@@ -33,6 +33,8 @@ private:
     void ReceiverLoop();
     void SendInput(uint32_t command, float value = 0.0f);
 
+    void renderHealthBar(const NetPlayerState& player);
+
     void createMapTexture();
     void updateMapTexture();
 

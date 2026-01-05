@@ -392,4 +392,20 @@ void SceneGame::renderHealthBar(Position playerPos, Player* player) {
     SDL_Rect healthBox = {barX, barY, barWidth, barHeight};
     SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
     SDL_RenderDrawRect(renderer, &healthBox);
+
+    // Numeric HP (e.g. "75/100")
+    if (m_font) {
+        std::string hpText = std::to_string(currentHealth) + "/" + std::to_string(maxHealth);
+        SDL_Color textColor = {255, 255, 255, 255};
+        SDL_Surface* hpSurface = TTF_RenderText_Solid(m_font, hpText.c_str(), textColor);
+        if (hpSurface) {
+            SDL_Texture* hpTexture = SDL_CreateTextureFromSurface(renderer, hpSurface);
+            if (hpTexture) {
+                SDL_Rect hpRect = {barX, barY - hpSurface->h - 2, hpSurface->w, hpSurface->h};
+                SDL_RenderCopy(renderer, hpTexture, NULL, &hpRect);
+                SDL_DestroyTexture(hpTexture);
+            }
+            SDL_FreeSurface(hpSurface);
+        }
+    }
 }

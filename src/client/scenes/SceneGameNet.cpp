@@ -365,6 +365,8 @@ void SceneGameNet::render() {
             Game::getInstance()->getRenderer(),
             0.0,
             flip);
+
+        renderHealthBar(pl);
     }
 
     // Draw projectiles.
@@ -423,6 +425,58 @@ void SceneGameNet::render() {
             drawText("Angle " + std::to_string(angleInt), 10, 10);
             drawText("Power " + std::to_string(powerInt), 10, 40);
             drawText("Time " + std::to_string(secondsLeft), 10, 70);
+        }
+    }
+}
+
+void SceneGameNet::renderHealthBar(const NetPlayerState& player) {
+    SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+    if (!renderer) return;
+
+    const int currentHealth = player.hp < 0 ? 0 : player.hp;
+    const int maxHealth = 100;
+
+    const int barWidth = 40;
+    const int barHeight = 6;
+    const int barX = (int)player.x + (32 - barWidth) / 2;
+    const int barY = (int)player.y - 10;
+
+    SDL_Rect healthBg = {barX, barY, barWidth, barHeight};
+    SDL_SetRenderDrawColor(renderer, 100, 20, 20, 255);
+    SDL_RenderFillRect(renderer, &healthBg);
+
+    const float ratio = (maxHealth > 0) ? (currentHealth / (float)maxHealth) : 0.0f;
+    int healthWidth = (int)(ratio * barWidth);
+    if (healthWidth < 0) healthWidth = 0;
+    if (healthWidth > barWidth) healthWidth = barWidth;
+
+    SDL_Rect healthFill = {barX, barY, healthWidth, barHeight};
+    if (currentHealth > 66) {
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    } else if (currentHealth > 33) {
+        SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+    } else {
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+    }
+    SDL_RenderFillRect(renderer, &healthFill);
+
+    SDL_Rect healthBox = {barX, barY, barWidth, barHeight};
+    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+    SDL_RenderDrawRect(renderer, &healthBox);
+
+    // Numeric HP (e.g. "75/100")
+    if (m_font) {
+        std::string hpText = std::to_string(currentHealth) + "/" + std::to_string(maxHealth);
+        SDL_Color textColor = {255, 255, 255, 255};
+        SDL_Surface* hpSurface = TTF_RenderText_Solid(m_font, hpText.c_str(), textColor);
+        if (hpSurface) {
+            SDL_Texture* hpTexture = SDL_CreateTextureFromSurface(renderer, hpSurface);
+            if (hpTexture) {
+                SDL_Rect hpRect = {barX, barY - hpSurface->h - 2, hpSurface->w, hpSurface->h};
+                SDL_RenderCopy(renderer, hpTexture, NULL, &hpRect);
+                SDL_DestroyTexture(hpTexture);
+            }
+            SDL_FreeSurface(hpSurface);
         }
     }
 }
