@@ -22,6 +22,25 @@ public:
     // Clear all states.
     void clean();
 
+    // Deferred transitions (safe to call from inside a state's update()).
+    void requestPushState(GameState* pState);
+    void requestChangeState(GameState* pState);
+    void requestPopState();
+    void requestReplaceAll(GameState* pState);
+
 private:
     std::vector<GameState*> m_gameStates;
+
+    enum class PendingOp {
+        None,
+        Push,
+        Change,
+        Pop,
+        ReplaceAll,
+    };
+
+    PendingOp m_pendingOp = PendingOp::None;
+    GameState* m_pendingState = nullptr;
+
+    void applyPending();
 };

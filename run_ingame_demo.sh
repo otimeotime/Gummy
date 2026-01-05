@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IP="${1:-127.0.0.1}"
-PORT="${2:-9090}"
+PORT="${PORT:-9090}"
+IP="${IP:-127.0.0.1}"
+
+# Usage: ./run_ingame_demo.sh <map name>
+# Example: ./run_ingame_demo.sh map1.txt
+MAP_ARG="${1:-flatmap.txt}"
+if [[ "$MAP_ARG" == */* ]]; then
+  MAP_PATH="$MAP_ARG"
+else
+  MAP_PATH="assets/maps/$MAP_ARG"
+fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
@@ -33,7 +42,17 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+need_build=0
 if [[ ! -x "$SERVER_BIN" || ! -x "$CLIENT_BIN" ]]; then
+  need_build=1
+else
+  # Rebuild when sources are newer than binaries.
+  if ! make -q server client; then
+    need_build=1
+  fi
+fi
+
+if [[ "$need_build" -eq 1 ]]; then
   echo "Building server/client..."
   make server client -j
 fi
@@ -72,12 +91,12 @@ for _ in {1..50}; do
 done
 
 echo "Launching 2 clients (close a window or Ctrl+C here to stop all)..."
-"$CLIENT_BIN" "$IP" "$PORT" >"$LOG_DIR/client1.log" 2>&1 &
+"$CLIENT_BIN" "$IP" "$PORT" "$MAP_PATH" >"$LOG_DIR/client1.log" 2>&1 &
 CLIENT1_PID=$!
 
 sleep 0.3
 
-"$CLIENT_BIN" "$IP" "$PORT" >"$LOG_DIR/client2.log" 2>&1 &
+"$CLIENT_BIN" "$IP" "$PORT" "$MAP_PATH" >"$LOG_DIR/client2.log" 2>&1 &
 CLIENT2_PID=$!
 
 # Wait until any client exits, then cleanup via trap.

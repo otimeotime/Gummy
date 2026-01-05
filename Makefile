@@ -25,6 +25,7 @@ CLIENT_SRCS := \
 	src/client/core/Window.cpp \
 	src/client/network/ClientSocket.cpp \
 	src/client/scenes/SceneGame.cpp \
+	src/client/scenes/TerminalScene.cpp \
 	src/client/ui/Button.cpp \
 	src/client/ui/Text.cpp \
 	src/client/ui/TextInput.cpp \

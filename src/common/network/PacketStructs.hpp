@@ -177,6 +177,7 @@ typedef struct {
     uint32_t tick;
     uint32_t roomState;
     float turnTimer;
+    float wind;
     uint8_t terrainModified;
     uint8_t hasExplosion;
     float explosionX;

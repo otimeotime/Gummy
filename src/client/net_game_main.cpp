@@ -10,15 +10,17 @@ const int DELAY_TIME = 1000.0f / FPS;
 int main(int argc, char* argv[]) {
     std::string ip = "127.0.0.1";
     int port = 9090;
+    std::string mapPath = "assets/maps/flatmap.txt";
 
     if (argc >= 2) ip = argv[1];
     if (argc >= 3) port = std::atoi(argv[2]);
+    if (argc >= 4) mapPath = argv[3];
 
     if (!Game::getInstance()->init("Gummy Network Client", 1280, 720)) {
         return -1;
     }
 
-    Game::getInstance()->getStateMachine()->pushState(new SceneGame(ip, port));
+    Game::getInstance()->getStateMachine()->pushState(new SceneGame(ip, port, mapPath));
 
     Uint32 frameStart, frameTime;
 

@@ -1,11 +1,36 @@
 #include "SceneGame.hpp"
 
+#include "TerminalScene.hpp"
+
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 
-SceneGame::SceneGame(std::string serverIp, int serverPort)
+#include <algorithm>
+
+namespace {
+bool g_showHitboxes = true;
+bool g_prevToggleHitboxes = false;
+
+void DrawCircleOutline(SDL_Renderer* renderer, int cx, int cy, int r) {
+    // Simple parametric circle; good enough for a debug overlay.
+    const int segments = 64;
+    double prevX = cx + r;
+    double prevY = cy;
+    for (int i = 1; i <= segments; i++) {
+        const double t = (2.0 * M_PI * i) / segments;
+        const double x = cx + r * std::cos(t);
+        const double y = cy + r * std::sin(t);
+        SDL_RenderDrawLine(renderer, (int)prevX, (int)prevY, (int)x, (int)y);
+        prevX = x;
+        prevY = y;
+    }
+}
+} // namespace
+
+SceneGame::SceneGame(std::string serverIp, int serverPort, std::string mapPath)
     : m_serverIp(std::move(serverIp)),
       m_serverPort(serverPort),
       m_running(false),
@@ -17,7 +42,7 @@ SceneGame::SceneGame(std::string serverIp, int serverPort)
       m_bgTextureID(""),
       m_playerID(""),
       m_bulletID(""),
-            m_mapPath("assets/maps/flatmap.txt"),
+                        m_mapPath(std::move(mapPath)),
             m_mapLoader(nullptr),
             m_mapTexture(nullptr),
             m_mapModified(true),
@@ -48,7 +73,10 @@ bool SceneGame::onEnter() {
 
     m_font = TTF_OpenFont("assets/font.ttf", 20);
     if (!m_font) {
-        std::cout << "SceneGame: Warning: Failed to load font (assets/font.ttf)" << std::endl;
+        m_font = TTF_OpenFont("assets/Arial.ttf", 20);
+    }
+    if (!m_font) {
+        std::cout << "SceneGame: Warning: Failed to load font (assets/font.ttf / assets/Arial.ttf)" << std::endl;
     }
 
     // Local terrain (visual only). Server-side terrain deformation is not replicated yet.
@@ -68,7 +96,7 @@ bool SceneGame::onEnter() {
         ReqIngameJoin join{};
         join.matchId = m_matchId;
         join.userId = 0;
-        join.mapName[0] = '\0';
+        std::snprintf(join.mapName, sizeof(join.mapName), "%s", m_mapPath.c_str());
 
         if (!PacketUtils::SendPacket(m_socket, PacketType::REQ_INGAME_JOIN, join)) {
             std::cerr << "SceneGame: failed to send join" << std::endl;
@@ -241,6 +269,13 @@ void SceneGame::update() {
         return;
     }
 
+    // Debug: toggle hitbox overlay (client-side only). Allow toggling anytime.
+    const bool toggleHitboxes = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_H);
+    if (toggleHitboxes && !g_prevToggleHitboxes) {
+        g_showHitboxes = !g_showHitboxes;
+    }
+    g_prevToggleHitboxes = toggleHitboxes;
+
     // Keep a local copy of server state for decision-making.
     ResIngameState state{};
     bool hasState = false;
@@ -269,6 +304,14 @@ void SceneGame::update() {
                 break;
             }
         }
+    }
+
+    // End game: rely on the authoritative server state to avoid clients disagreeing
+    // during join/startup when snapshots may temporarily include only one player.
+    if (!m_terminalQueued && hasState && state.roomState == 3u) {
+        m_terminalQueued = true;
+        Game::getInstance()->getStateMachine()->requestPushState(new TerminalScene(m_serverIp, m_serverPort));
+        return;
     }
 
     // Only send gameplay inputs during our turn and when the room is PLAYING_TURN.
@@ -302,9 +345,20 @@ void SceneGame::update() {
         SendInput(INGAME_CMD_ADJUST_ANGLE, -0.5f);
     }
 
-    if (InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_SPACE)) {
+    // Power hold mechanic:
+    // - Press SPACE: reset power to 0, start charging.
+    // - Hold SPACE: keep increasing power.
+    // - Release SPACE: keep the last power value (no more updates).
+    static bool wasSpacePressed = false;
+    const bool isSpacePressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_SPACE);
+    if (isSpacePressed && !wasSpacePressed) {
+        // Reset power on a new charge attempt (server clamps to [0..100]).
+        SendInput(INGAME_CMD_ADJUST_POWER, -1000.0f);
+    }
+    if (isSpacePressed) {
         SendInput(INGAME_CMD_ADJUST_POWER, 60.0f * dt);
     }
+    wasSpacePressed = isSpacePressed;
 
     static bool wasEnterPressed = false;
     const bool isEnterPressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_RETURN);
@@ -367,6 +421,23 @@ void SceneGame::render() {
             0.0,
             flip);
 
+        // Debug hitbox overlay.
+        if (g_showHitboxes) {
+            SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+            if (renderer) {
+                // Sprite bounds
+                SDL_Rect rect{(int)pl.x, (int)pl.y, 32, 32};
+                SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+                SDL_RenderDrawRect(renderer, &rect);
+
+                // Approx projectile hitbox (server collision radius is ~20)
+                const int cx = (int)pl.x + 16;
+                const int cy = (int)pl.y + 16;
+                SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
+                DrawCircleOutline(renderer, cx, cy, 20);
+            }
+        }
+
         renderHealthBar(pl);
     }
 
@@ -389,83 +460,151 @@ void SceneGame::render() {
         SDL_RenderFillRect(Game::getInstance()->getRenderer(), &r);
     }
 
-    // HUD: show Angle/Power/Time for local player.
-    if (m_font) {
-        NetPlayerState me{};
-        bool foundMe = false;
-        for (uint8_t i = 0; i < state.playerCount && i < INGAME_MAX_PLAYERS; i++) {
-            if (state.players[i].id == m_playerId) {
-                me = state.players[i];
-                foundMe = true;
-                break;
-            }
+    // HUD: local-player-only indicators.
+    NetPlayerState me{};
+    bool foundMe = false;
+    for (uint8_t i = 0; i < state.playerCount && i < INGAME_MAX_PLAYERS; i++) {
+        if (state.players[i].id == m_playerId) {
+            me = state.players[i];
+            foundMe = true;
+            break;
+        }
+    }
+
+    if (!foundMe) return;
+
+    SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+    if (!renderer) return;
+
+    const int angleInt = (int)me.angle;
+    const int powerInt = (int)me.power;
+    const bool isMyTurn = (me.isMyTurn != 0) && (state.roomState == 1u);
+
+    float timeLeft = state.turnTimer;
+    if (timeLeft < 0.0f) timeLeft = 0.0f;
+    int secondsLeft = (int)(timeLeft + 0.999f);
+
+    auto drawText = [&](const std::string& text, int x, int y) {
+        if (!m_font) return;
+        SDL_Color textColor = {255, 255, 255, 255};
+        SDL_Surface* surface = TTF_RenderText_Solid(m_font, text.c_str(), textColor);
+        if (!surface) return;
+        SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surface);
+        if (tex) {
+            SDL_Rect rect = {x, y, surface->w, surface->h};
+            SDL_RenderCopy(renderer, tex, NULL, &rect);
+            SDL_DestroyTexture(tex);
+        }
+        SDL_FreeSurface(surface);
+    };
+
+    auto drawTextScaled = [&](const std::string& text, int x, int y, float scale, int* outW, int* outH) {
+        if (outW) *outW = 0;
+        if (outH) *outH = 0;
+        if (!m_font) return;
+        SDL_Color textColor = {255, 255, 255, 255};
+        SDL_Surface* surface = TTF_RenderText_Solid(m_font, text.c_str(), textColor);
+        if (!surface) return;
+        SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surface);
+        if (tex) {
+            const int w = (int)std::lround(surface->w * scale);
+            const int h = (int)std::lround(surface->h * scale);
+            SDL_Rect rect = {x, y, w, h};
+            SDL_RenderCopy(renderer, tex, NULL, &rect);
+            SDL_DestroyTexture(tex);
+            if (outW) *outW = w;
+            if (outH) *outH = h;
+        }
+        SDL_FreeSurface(surface);
+    };
+
+    // 1) Angle: red line only during our turn, numeric value at line tip.
+    if (isMyTurn) {
+        constexpr float kPi = 3.14159265358979323846f;
+        const float rad = me.angle * (kPi / 180.0f);
+        const float directionMult = (me.orient != 0) ? 1.0f : -1.0f;
+        const float lineLen = 70.0f;
+
+        const int startX = (int)me.x + 16;
+        const int startY = (int)me.y + 16;
+        const int tipX = startX + (int)(std::cos(rad) * lineLen * directionMult);
+        const int tipY = startY + (int)(-std::sin(rad) * lineLen);
+
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        SDL_RenderDrawLine(renderer, startX, startY, tipX, tipY);
+
+        drawText(std::to_string(angleInt), tipX + 6, tipY - 10);
+    }
+
+    // 2) Power: single-line UI: "Power: <bar> value"
+    {
+        const int barX = 10;
+        const int barY = 10;
+        const int barW = 160;
+        const int barH = 12;
+        const float ratio = (powerInt <= 0) ? 0.0f : (powerInt >= 100 ? 1.0f : (powerInt / 100.0f));
+        const int fillW = (int)(barW * ratio);
+
+        int labelW = 0;
+        int labelH = 0;
+        if (m_font) {
+            // Measure so we can place the bar right after the label.
+            TTF_SizeText(m_font, "Power", &labelW, &labelH);
         }
 
-        if (foundMe) {
-            SDL_Renderer* renderer = Game::getInstance()->getRenderer();
-            SDL_Color textColor = {255, 255, 255, 255};
+        const int labelX = barX;
+        const int labelY = barY + (barH - labelH) / 2;
+        const int barOffsetX = barX + labelW + 8;
+        const int valueX = barOffsetX + barW + 8;
 
-            const int angleInt = (int)me.angle;
-            const int powerInt = (int)me.power;
-            float timeLeft = state.turnTimer;
-            if (timeLeft < 0.0f) timeLeft = 0.0f;
-            int secondsLeft = (int)(timeLeft + 0.999f);
+        drawText("Power", labelX, labelY);
 
-            auto drawText = [&](const std::string& text, int x, int y) {
-                SDL_Surface* surface = TTF_RenderText_Solid(m_font, text.c_str(), textColor);
-                if (!surface) return;
-                SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surface);
-                if (tex) {
-                    SDL_Rect rect = {x, y, surface->w, surface->h};
-                    SDL_RenderCopy(renderer, tex, NULL, &rect);
-                    SDL_DestroyTexture(tex);
-                }
-                SDL_FreeSurface(surface);
-            };
+        SDL_Rect bg{barOffsetX, barY, barW, barH};
+        SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
+        SDL_RenderFillRect(renderer, &bg);
 
-            // 1) Local-only angle indicator: red line + angle label at the tip.
-            {
-                constexpr float kPi = 3.14159265358979323846f;
-                const float rad = me.angle * (kPi / 180.0f);
-                const float directionMult = (me.orient != 0) ? 1.0f : -1.0f;
-                const float lineLen = 70.0f;
+        SDL_Rect fill{barOffsetX, barY, fillW, barH};
+        SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+        SDL_RenderFillRect(renderer, &fill);
 
-                const int startX = (int)me.x + 16;
-                const int startY = (int)me.y + 16;
-                const int tipX = startX + (int)(std::cos(rad) * lineLen * directionMult);
-                const int tipY = startY + (int)(-std::sin(rad) * lineLen);
+        SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
+        SDL_RenderDrawRect(renderer, &bg);
 
-                SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-                SDL_RenderDrawLine(renderer, startX, startY, tipX, tipY);
+        drawText(std::to_string(powerInt), valueX, labelY);
+    }
 
-                // Move the angle numeric value from top-left to the tip of the red line.
-                drawText(std::to_string(angleInt), tipX + 6, tipY - 10);
-            }
+    // 3) Timer: top-center, larger font size, "TIME" then newline then number.
+    {
+        const float scale = 2.0f;
+        const std::string label = "TIME";
+        const std::string value = std::to_string(secondsLeft);
 
-            // 2) Local-only power indicator: yellow bar at top-left + numeric value.
-            {
-                const int barX = 10;
-                const int barY = 10;
-                const int barW = 180;
-                const int barH = 12;
-                const float ratio = (powerInt <= 0) ? 0.0f : (powerInt >= 100 ? 1.0f : (powerInt / 100.0f));
-                const int fillW = (int)(barW * ratio);
-
-                SDL_Rect bg{barX, barY, barW, barH};
-                SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
-                SDL_RenderFillRect(renderer, &bg);
-
-                SDL_Rect fill{barX, barY, fillW, barH};
-                SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
-                SDL_RenderFillRect(renderer, &fill);
-
-                SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
-                SDL_RenderDrawRect(renderer, &bg);
-
-                drawText("Power " + std::to_string(powerInt), barX, barY + barH + 6);
-                drawText("Time " + std::to_string(secondsLeft), barX, barY + barH + 32);
-            }
+        int labelW = 0, labelH = 0;
+        int valueW = 0, valueH = 0;
+        if (m_font) {
+            TTF_SizeText(m_font, label.c_str(), &labelW, &labelH);
+            TTF_SizeText(m_font, value.c_str(), &valueW, &valueH);
+            labelW = (int)std::lround(labelW * scale);
+            labelH = (int)std::lround(labelH * scale);
+            valueW = (int)std::lround(valueW * scale);
+            valueH = (int)std::lround(valueH * scale);
         }
+
+        const int blockW = std::max(labelW, valueW);
+        const int screenW = 1280;
+        const int x = (screenW - blockW) / 2;
+        const int y = 8;
+
+        drawTextScaled(label, x + (blockW - labelW) / 2, y, scale, nullptr, nullptr);
+        drawTextScaled(value, x + (blockW - valueW) / 2, y + labelH + 2, scale, nullptr, nullptr);
+    }
+
+    // 4) Wind: top-left numeric indicator with direction glyph.
+    {
+        const float w = state.wind * 10.0f;
+        const char dir = (w > 0.0f) ? '>' : '<';
+        const int mag = (int)std::lround(std::fabs(w));
+        drawText(std::string("WIND ") + dir + " " + std::to_string(mag), 10, 34);
     }
 }
 
@@ -504,19 +643,54 @@ void SceneGame::renderHealthBar(const NetPlayerState& player) {
     SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
     SDL_RenderDrawRect(renderer, &healthBox);
 
-    // Numeric HP
+    // Numeric HP (centered over the health bar)
+    int hpTextX = barX + barWidth / 2;
+    int hpTextY = barY - 10; // will be corrected if font loads
+    int hpTextW = 0;
+    int hpTextH = 0;
+
     if (m_font) {
         std::string hpText = std::to_string(currentHealth);
         SDL_Color textColor = {255, 255, 255, 255};
         SDL_Surface* hpSurface = TTF_RenderText_Solid(m_font, hpText.c_str(), textColor);
         if (hpSurface) {
+            hpTextW = hpSurface->w;
+            hpTextH = hpSurface->h;
+            hpTextX = barX + (barWidth - hpTextW) / 2;
+            hpTextY = barY - hpTextH - 2;
+
             SDL_Texture* hpTexture = SDL_CreateTextureFromSurface(renderer, hpSurface);
             if (hpTexture) {
-                SDL_Rect hpRect = {barX, barY - hpSurface->h - 2, hpSurface->w, hpSurface->h};
+                SDL_Rect hpRect = {hpTextX, hpTextY, hpTextW, hpTextH};
                 SDL_RenderCopy(renderer, hpTexture, NULL, &hpRect);
                 SDL_DestroyTexture(hpTexture);
             }
             SDL_FreeSurface(hpSurface);
         }
+    }
+
+    // Turn indicator: filled red upside-down triangle with white stroke,
+    // positioned above the HP value with a small padding.
+    if (player.isMyTurn != 0) {
+        const int triPadding = 3;
+        const int triHalfW = 6;
+        const int triH = 8;
+
+        const int centerX = barX + barWidth / 2;
+        const int hpTopY = (hpTextH > 0) ? hpTextY : (barY - 2);
+        const int topY = hpTopY - triPadding - triH;
+
+        // Filled triangle (scanline fill)
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        for (int y = 0; y <= triH; y++) {
+            const int half = (triHalfW * (triH - y)) / triH;
+            SDL_RenderDrawLine(renderer, centerX - half, topY + y, centerX + half, topY + y);
+        }
+
+        // White outline
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_RenderDrawLine(renderer, centerX - triHalfW, topY, centerX + triHalfW, topY);
+        SDL_RenderDrawLine(renderer, centerX - triHalfW, topY, centerX, topY + triH);
+        SDL_RenderDrawLine(renderer, centerX + triHalfW, topY, centerX, topY + triH);
     }
 }

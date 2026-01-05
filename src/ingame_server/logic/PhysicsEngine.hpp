@@ -167,4 +167,6 @@ public:
         WIND = wind;
         std::cout << "Wind set to: " << WIND << std::endl;
     }
+
+    float getWind() const { return WIND; }
 };

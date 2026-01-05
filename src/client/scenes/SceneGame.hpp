@@ -20,7 +20,7 @@
 
 class SceneGame : public GameState {
 public:
-    SceneGame(std::string serverIp = "127.0.0.1", int serverPort = 9090);
+    SceneGame(std::string serverIp = "127.0.0.1", int serverPort = 9090, std::string mapPath = "assets/maps/flatmap.txt");
 
     bool onEnter() override;
     bool onExit() override;
@@ -66,4 +66,6 @@ private:
     TTF_Font* m_font;
 
     Uint32 m_lastTick;
+
+    bool m_terminalQueued = false;
 };
