@@ -15,6 +15,8 @@ enum PacketType {
     RES_UPDATE_PROFILE,
     REQ_SEARCH_USER,
     RES_SEARCH_USER,
+    REQ_GET_USER_LIST,
+    RES_GET_USER_LIST,
     // Game Room Packets
     REQ_MATCH_FIND,
     RES_MATCH_FIND,

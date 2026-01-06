@@ -5,10 +5,12 @@
 #include "../ui/Button.hpp"
 #include <vector>
 #include <string>
+#include "../network/ClientSocket.hpp" // For PlayerStatusInfo and PacketStructs if needed. Accessing PacketStructs via ClientSocket usually, but needed for PlayerStatusInfo type.
 
 class SceneDashboard : public GameState {
 public:
     SceneDashboard(std::string username);
+
 
     virtual bool onEnter() override;
     virtual bool onExit() override;
@@ -21,8 +23,13 @@ private:
     std::vector<UIObject*> m_uiObjects;
     std::string m_bgTextureID;
 
-    // Online Players List
-    std::vector<std::string> m_onlinePlayers;
+    // Specific UI pointers for updates
+    Text* m_lblWelcome;
+
+    // Players List
+    std::vector<PlayerStatusInfo> m_allPlayers;
+    std::vector<Text*> m_playerListTexts; // Separate list for dynamic UI
+    uint32_t m_lastRefreshTime;
     
     // Player Menu Popup State
     bool m_showPlayerMenu;
@@ -39,4 +46,5 @@ private:
     void drawPlayerMenu();
     void handlePlayerListClick();
     bool isMouseInsideMenu(Vector2D* mousePos);
+    void refreshPlayerList(); // New helper
 };

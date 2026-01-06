@@ -27,6 +27,12 @@ public:
     // Draw a frame with scaling (Source Size != Dest Size)
     void drawFrameScaled(std::string id, int srcW, int srcH, int destX, int destY, int destW, int destH, int currentRow, int currentFrame, SDL_Renderer* renderer, double angle = 0, int alpha = 255, SDL_RendererFlip flip = SDL_FLIP_NONE);
 
+    // Draw a filled rectangle (primitive)
+    void drawFillRect(int x, int y, int width, int height, int r, int g, int b, int a, SDL_Renderer* renderer);
+
+    // Draw a line
+    void drawLine(int x1, int y1, int x2, int y2, int r, int g, int b, int a, SDL_Renderer* renderer);
+
     // Remove texture from memory
     void clearFromTextureMap(std::string id);
 

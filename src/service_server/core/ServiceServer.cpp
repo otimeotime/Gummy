@@ -52,6 +52,7 @@ void ServiceServer::Run(int port) {
 
 void ServiceServer::HandleClient(TCPSocket* clientSocket) {
     bool connected = true;
+    std::string currentUsername = "";
     std::vector<char> headerBuffer(sizeof(Header));
 
     while (connected && mIsRunning) {
@@ -96,9 +97,29 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
                 ResAuthenticate res;
                 if (req.isLogin) {
                     if (mAuthServer.login(req.username, req.password, outUser)) {
-                        res.isLogin = true;
-                        res.isSuccess = true;
-                        std::snprintf(res.message, sizeof(res.message), "Login successful. Welcome, %s!", outUser.username.c_str());
+                        bool isAlreadyActive = false;
+                        {
+                            std::lock_guard<std::mutex> lock(mClientsMutex);
+                            if (mConnectedUsers.find(outUser.username) != mConnectedUsers.end()) {
+                                isAlreadyActive = true;
+                            }
+                        }
+
+                        if (isAlreadyActive) {
+                            res.isLogin = true;
+                            res.isSuccess = false;
+                            std::snprintf(res.message, sizeof(res.message), "Login failed. Account entered from another terminal.");
+                        } else {
+                            res.isLogin = true;
+                            res.isSuccess = true;
+                            std::snprintf(res.message, sizeof(res.message), "Login successful. Welcome, %s!", outUser.username.c_str());
+                            
+                            currentUsername = outUser.username;
+                            {
+                                std::lock_guard<std::mutex> lock(mClientsMutex);
+                                mConnectedUsers.insert(currentUsername);
+                            }
+                        }
                     } else {
                         res.isLogin = true;
                         res.isSuccess = false;
@@ -124,6 +145,11 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
             // User LOGOUT -------------------------------------------------------------------------------------------------------------------------------
             case PacketType::REQ_LOGOUT: {
                 std::cout << "Client requested logout." << std::endl;
+                if (!currentUsername.empty()) {
+                    std::lock_guard<std::mutex> lock(mClientsMutex);
+                    mConnectedUsers.erase(currentUsername);
+                    currentUsername = "";
+                }
                 connected = false; 
             }
             break;
@@ -144,10 +170,42 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
             }
             break;
             // -------------------------------------------------------------------------------------------------------------------------------------------
+            // GET USER LIST
+            case PacketType::REQ_GET_USER_LIST: {
+                std::vector<UserData> allUsers = mAuthServer.getAllUsers();
+                ResGetUserList res;
+                res.count = 0;
+                
+                std::unordered_set<std::string> onlineSnapshot;
+                {
+                    std::lock_guard<std::mutex> lock(mClientsMutex);
+                    onlineSnapshot = mConnectedUsers;
+                }
+
+                for (const auto& u : allUsers) {
+                    if (res.count >= 20) break;
+                    
+                    PlayerStatusInfo& info = res.players[res.count];
+                    std::strncpy(info.username, u.username.c_str(), 31);
+                    info.username[31] = '\0';
+                    info.isOnline = (onlineSnapshot.find(u.username) != onlineSnapshot.end());
+                    info.elo = u.elo;
+                    
+                    res.count++;
+                }
+                PacketUtils::SendPacket(clientSocket, PacketType::RES_GET_USER_LIST, res);
+            }
+            break;
+            // -------------------------------------------------------------------------------------------------------------------------------------------
             default:
                 std::cerr << "Thread Client received unknown packet type: " << static_cast<int>(header.type) << std::endl;
                 break;
         }
+    }
+
+    if (!currentUsername.empty()) {
+        std::lock_guard<std::mutex> lock(mClientsMutex);
+        mConnectedUsers.erase(currentUsername);
     }
 
     clientSocket->Close();

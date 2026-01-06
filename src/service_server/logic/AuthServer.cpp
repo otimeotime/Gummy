@@ -28,3 +28,7 @@ bool AuthServer::reg(const std::string& username, const std::string& password, l
 bool AuthServer::changePassword(long userId, const std::string& newPassword) {
     return userDao->updatePassword(userId, newPassword);
 }
+
+std::vector<UserData> AuthServer::getAllUsers() {
+    return userDao->getAllUsers();
+}

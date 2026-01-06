@@ -28,6 +28,8 @@ public:
 
     std::string Login(const std::string& username, const std::string& password);
     std::string Register(const std::string& username, const std::string& password);
+    std::vector<PlayerStatusInfo> GetUserList();
+
     bool ChangePassword(const std::string& currentPassword, const std::string& newPassword);
     void Logout();
     

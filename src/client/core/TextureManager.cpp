@@ -103,3 +103,15 @@ void TextureManager::drawScaled(std::string id, int x, int y, int width, int hei
     // 3. Render
     SDL_RenderCopyEx(renderer, textureMap[id], &srcRect, &destRect, angle, 0, flip);
 }
+void TextureManager::drawFillRect(int x, int y, int width, int height, int r, int g, int b, int a, SDL_Renderer* renderer) {
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, r, g, b, a);
+    SDL_Rect rect = {x, y, width, height};
+    SDL_RenderFillRect(renderer, &rect);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE); // Reset or Keep? Usually reset or keep consistent.
+}
+
+void TextureManager::drawLine(int x1, int y1, int x2, int y2, int r, int g, int b, int a, SDL_Renderer* renderer) {
+    SDL_SetRenderDrawColor(renderer, r, g, b, a);
+    SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
+}

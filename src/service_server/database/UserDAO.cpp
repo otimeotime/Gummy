@@ -123,3 +123,24 @@ std::optional<UserData> UserDAO::getUserById(long userId) {
         return std::nullopt;
     }
 }
+
+std::vector<UserData> UserDAO::getAllUsers() {
+    std::vector<UserData> users;
+    try {
+        pqxx::work W(*db->getConnection());
+        std::string sql = "SELECT user_id, username, elo, COALESCE(info, '') FROM \"User\" ORDER BY username ASC;";
+        pqxx::result R = W.exec(sql);
+        
+        for (auto row : R) {
+            users.push_back({
+                row[0].as<long>(),
+                row[1].as<std::string>(),
+                row[2].as<int>(),
+                row[3].as<std::string>() 
+            });
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "GetAllUsers Error: " << e.what() << std::endl;
+    }
+    return users;
+}

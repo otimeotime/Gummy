@@ -39,6 +39,22 @@ typedef struct {
     char message[100];
 } ResSearchUser;
 
+// --- Get User List (Dashboard) ---
+typedef struct {
+    int dummy;
+} ReqGetUserList;
+
+struct PlayerStatusInfo {
+    char username[32];
+    bool isOnline;
+    int elo;
+};
+
+typedef struct {
+    int count;
+    PlayerStatusInfo players[20]; // Limit 20
+} ResGetUserList;
+
 typedef struct {
     uint32_t userId[32];
     char info[1000];

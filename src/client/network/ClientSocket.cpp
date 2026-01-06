@@ -102,6 +102,28 @@ void ClientSocket::Logout() {
     // Just send the logout request; server usually disconnects or invalidates session
     PacketUtils::SendPacket(mSocket, PacketType::REQ_LOGOUT);
     
-    // Logic dictates we might want to close connection on client side too
-    Disconnect();
+    // Do NOT disconnect the socket, as we want to return to Login screen and reuse it.
+    // Disconnect(); 
+}
+std::vector<PlayerStatusInfo> ClientSocket::GetUserList() {
+    std::vector<PlayerStatusInfo> result;
+    if (!mIsConnected) return result;
+
+    ReqGetUserList req; 
+    req.dummy = 0;
+
+    if (!PacketUtils::SendPacket(mSocket, PacketType::REQ_GET_USER_LIST, req)) {
+        std::cerr << "Failed to send GetUserList request." << std::endl;
+        return result;
+    }
+
+    ResGetUserList res; 
+    if (PacketUtils::ReceivePacketPayload(mSocket, res)) {
+        for (int i=0; i < res.count; ++i) {
+            result.push_back(res.players[i]);
+        }
+    } else {
+        std::cerr << "Failed to receive GetUserList response." << std::endl;
+    }
+    return result;
 }

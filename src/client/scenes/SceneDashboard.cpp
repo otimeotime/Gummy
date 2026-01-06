@@ -8,24 +8,12 @@
 SceneDashboard::SceneDashboard(std::string username) 
     : m_username(username), m_showPlayerMenu(false), 
       m_btnChallenge(nullptr), m_btnProfile(nullptr),
-      m_lblChallenge(nullptr), m_lblProfile(nullptr)
+      m_lblChallenge(nullptr), m_lblProfile(nullptr),
+      m_lblWelcome(nullptr)
 {
-    // Mock Data
-    m_onlinePlayers = {"PlayerOne", "DragonSlayer", "GummyBear", "ProGamer99", "TestUser"};
-    
-    // Create Text objects for players
-    int sidebarX = 1280 - 300 + 20;
-    int startY = 100;
-    int gap = 50;
-    
-    Text* lblOnlineTitle = new Text(sidebarX, 50, "assets/Arial.ttf", 24, "ONLINE PLAYERS", {0, 255, 0, 255});
-    m_uiObjects.push_back(lblOnlineTitle);
-
-    for (size_t i = 0; i < m_onlinePlayers.size(); i++) {
-        Text* t = new Text(sidebarX, startY + (i * gap), "assets/Arial.ttf", 20, m_onlinePlayers[i], {200, 200, 200, 255});
-        m_uiObjects.push_back(t);
-    }
+    // Implementation moved to onEnter to fetch real data
 }
+
 
 bool SceneDashboard::onEnter() {
     std::cout << "[SceneDashboard] Entering as " << m_username << "..." << std::endl;
@@ -43,15 +31,26 @@ bool SceneDashboard::onEnter() {
     int screenH = 720;
     int sidebarW = 300;
 
+    // --- PLAYER LIST ---
+    std::cout << "[SceneDashboard] Fetching user list..." << std::endl;
+    m_allPlayers = Game::getInstance()->getClientSocket()->GetUserList();
+
+    int sidebarX = 1280 - 300 + 20;
+    
+    // Sidebar Title
+    Text* lblOnlineTitle = new Text(sidebarX, 50, "assets/Arial.ttf", 24, "PLAYERS", {255, 255, 0, 255});
+    m_uiObjects.push_back(lblOnlineTitle);
+
     // --- HEADER ---
-    std::string welcomeMsg = "Welcome, " + m_username + "!";
-    Text* lblWelcome = new Text(30, 30, "assets/Arial.ttf", 24, welcomeMsg, {255, 255, 255, 255});
-    m_uiObjects.push_back(lblWelcome);
+    // Initialize Welcome Label (Dynamic update later)
+    m_lblWelcome = new Text(30, 30, "assets/Arial.ttf", 24, "Welcome, " + m_username + "!", {255, 255, 255, 255});
+    m_uiObjects.push_back(m_lblWelcome);
 
     // Logout Button
     int logoutW = 100;
     int logoutH = 40;
     Button* btnLogout = new Button(screenW - logoutW - 30, 30, logoutW, logoutH, "btn_generic", []() {
+        Game::getInstance()->getClientSocket()->Logout(); // Send Logout Packet
         Game::getInstance()->getStateMachine()->changeState(new SceneLogin());
     }, 181, 73);
     m_uiObjects.push_back(btnLogout);
@@ -92,13 +91,74 @@ bool SceneDashboard::onEnter() {
 
     m_lblProfile = new Text(0, 0, "assets/Arial.ttf", 16, "View Profile", {0,0,0,255});
 
+    // Initial Refresh
+    refreshPlayerList();
+    m_lastRefreshTime = SDL_GetTicks();
+
     return true;
 }
 
+void SceneDashboard::refreshPlayerList() {
+    // 1. Clear old texts
+    for (auto t : m_playerListTexts) {
+        t->clean(); // If Text had resources
+        delete t;
+    }
+    m_playerListTexts.clear();
+
+    // 2. Fetch new list
+    m_allPlayers = Game::getInstance()->getClientSocket()->GetUserList();
+
+    // 3. Rebuild texts
+    int sidebarX = 1280 - 300 + 20;
+    int startY = 100;
+    int gap = 50;
+
+    int drawCount = 0;
+    std::string myEloPart = "";
+
+    for (size_t i = 0; i < m_allPlayers.size(); i++) {
+        // Filter Self from the list
+        if (std::string(m_allPlayers[i].username) == m_username) {
+            myEloPart = " (ELO: " + std::to_string(m_allPlayers[i].elo) + ")";
+            continue;
+        }
+
+        SDL_Color color;
+        if (m_allPlayers[i].isOnline) {
+            color = {0, 255, 0, 255}; // Green
+        } else {
+            color = {128, 128, 128, 255}; // Gray
+        }
+        
+        std::string entry = std::string(m_allPlayers[i].username) + " (" + std::to_string(m_allPlayers[i].elo) + ")";
+        
+        Text* t = new Text(sidebarX, startY + (drawCount * gap), "assets/Arial.ttf", 20, entry, color);
+        m_playerListTexts.push_back(t);
+        drawCount++;
+    }
+
+    // Update Welcome Header safely
+    if (m_lblWelcome) {
+        m_lblWelcome->setText("Welcome, " + m_username + "!" + myEloPart);
+    }
+}
+
 void SceneDashboard::update() {
+    // 1. Auto Refresh every 1 second
+    if (SDL_GetTicks() - m_lastRefreshTime > 1000) {
+        refreshPlayerList();
+        m_lastRefreshTime = SDL_GetTicks();
+    }
+
     // Update standard UI
     for (auto obj : m_uiObjects) {
         obj->update();
+    }
+    
+    // Update dynamic player texts
+    for (auto t : m_playerListTexts) {
+        t->update();
     }
 
     // Detect "Just Pressed"
@@ -143,28 +203,77 @@ void SceneDashboard::handlePlayerListClick() {
     // Note: We already checked justPressed in update(), so we assume this is a valid click event.
 
     Vector2D* mouse = InputHandler::getInstance()->getMousePosition();
-    int sidebarX = 1280 - 300;
+    int sidebarX = 1280 - 300 + 20;
     int startY = 100;
     int itemH = 50;
 
     if (mouse->x > sidebarX && mouse->y > startY) {
         int index = (mouse->y - startY) / itemH;
-        if (index >= 0 && index < m_onlinePlayers.size()) {
-            // Clicked on a player
-            m_selectedPlayer = m_onlinePlayers[index];
-            m_showPlayerMenu = true;
-            m_menuPosition = *mouse;
-            
-            // Position buttons near mouse
-            m_btnChallenge->setPosition(m_menuPosition.x - 150, m_menuPosition.y);
-            m_lblChallenge->setPosition(m_menuPosition.x - 150 + 30, m_menuPosition.y + 10); 
-            
-            m_btnProfile->setPosition(m_menuPosition.x - 150, m_menuPosition.y + 50);
-            m_lblProfile->setPosition(m_menuPosition.x - 150 + 25, m_menuPosition.y + 60);
-            
-            std::cout << "Selected: " << m_selectedPlayer << std::endl;
+        
+        // We need to map this index to the FILTERED list (m_playerListTexts corresponds to it visually)
+        // m_playerListTexts size is the count of displayed users.
+        if (index >= 0 && index < (int)m_playerListTexts.size()) {
+             // Retrieve the actual username from the Text object string? No, Text object has "Name (ELO)".
+             // We need to know which user it is.
+             // Best way: Reconstruct the filtering logic or store a parallel vector of "DisplayedUsers".
+             
+             // Quick fix: Iterate m_allPlayers just like we did in refreshPlayerList
+             int currentVisIndex = 0;
+             std::string selectedUser = "";
+             
+             for (const auto& p : m_allPlayers) {
+                 if (std::string(p.username) == m_username) continue;
+                 
+                 if (currentVisIndex == index) {
+                     selectedUser = p.username;
+                     break;
+                 }
+                 currentVisIndex++;
+             }
+
+             if (!selectedUser.empty()) {
+                m_selectedPlayer = selectedUser;
+                m_showPlayerMenu = true;
+                m_menuPosition = *mouse;
+                
+                // Position buttons near mouse
+                m_btnChallenge->setPosition(m_menuPosition.x - 150, m_menuPosition.y);
+                m_lblChallenge->setPosition(m_menuPosition.x - 150 + 30, m_menuPosition.y + 10); 
+                
+                m_btnProfile->setPosition(m_menuPosition.x - 150, m_menuPosition.y + 50);
+                m_lblProfile->setPosition(m_menuPosition.x - 150 + 25, m_menuPosition.y + 60);
+                
+                std::cout << "Selected: " << m_selectedPlayer << std::endl;
+             }
         }
     }
+}
+
+void SceneDashboard::drawPlayerMenu() {
+    if (!m_showPlayerMenu) return;
+
+    // Draw Menu Background
+    SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+    
+    // Use TextureManager for drawing primitives too
+    TextureManager::getInstance()->drawFillRect(
+        (int)m_menuPosition.x - 160, 
+        (int)m_menuPosition.y - 10, 
+        160, 110, 
+        50, 50, 50, 255, 
+        renderer
+    );
+
+    // Draw Buttons
+    m_btnChallenge->draw();
+    m_btnProfile->draw();
+    
+    // Draw Labels
+    m_lblChallenge->setPosition(m_btnChallenge->getPosition().x + 30, m_btnChallenge->getPosition().y + 10);
+    m_lblChallenge->draw();
+    
+    m_lblProfile->setPosition(m_btnProfile->getPosition().x + 25, m_btnProfile->getPosition().y + 10);
+    m_lblProfile->draw();
 }
 
 void SceneDashboard::drawSidebar() {
@@ -174,52 +283,16 @@ void SceneDashboard::drawSidebar() {
     int sidebarW = 300;
     int sidebarX = screenW - sidebarW;
 
-    // Draw Sidebar Background (Semi-transparent Black)
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 150);
-    SDL_Rect sidebarRect = {sidebarX, 0, sidebarW, screenH};
-    SDL_RenderFillRect(renderer, &sidebarRect);
-
-    // Draw Title
-    // We can use a static Text object or create one on fly (inefficient)
-    // For now, let's assume we added it to m_uiObjects or draw manually.
-    // Let's just use a temporary Text for simplicity of this snippet, 
-    // BUT creating textures every frame is BAD.
-    // Ideally, these should be members. I'll skip the title text for now or use a member if I added it.
+    // Draw Sidebar Background (Semi-transparent Black) via TextureManager
+    TextureManager::getInstance()->drawFillRect(sidebarX, 0, sidebarW, screenH, 0, 0, 0, 150, renderer);
     
-    // Draw Player List
-    int startY = 100;
-    int itemH = 50;
+    // Draw Player List (Dynamic)
+    for (auto t : m_playerListTexts) {
+        t->draw();
+    }
     
-    // We need a font. We can reuse one or load one.
-    // To avoid creating textures every frame, we should have created Text objects for each player in onEnter.
-    // But the list is dynamic.
-    // The Text class creates a texture in constructor.
-    // For a dynamic list, we usually cache textures.
-    // For this demo, I will iterate and draw text using a helper if available, 
-    // OR I will just create Text objects in onEnter since the list is static mock data.
-}
-
-void SceneDashboard::drawPlayerMenu() {
-    if (!m_showPlayerMenu) return;
-
-    // Draw Menu Background
-    SDL_Renderer* renderer = Game::getInstance()->getRenderer();
-    SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
-    SDL_Rect menuRect = {(int)m_menuPosition.x - 160, (int)m_menuPosition.y - 10, 160, 110};
-    SDL_RenderFillRect(renderer, &menuRect);
-
-    // Draw Buttons
-    m_btnChallenge->draw();
-    m_btnProfile->draw();
-    
-    // Draw Labels (We need to manually update their positions before drawing if they moved)
-    // I updated positions in handlePlayerListClick.
-    m_lblChallenge->setPosition(m_btnChallenge->getPosition().x + 30, m_btnChallenge->getPosition().y + 10);
-    m_lblChallenge->draw();
-    
-    m_lblProfile->setPosition(m_btnProfile->getPosition().x + 25, m_btnProfile->getPosition().y + 10);
-    m_lblProfile->draw();
+    // 4. Popup Menu
+    drawPlayerMenu();
 }
 
 void SceneDashboard::render() {
@@ -231,28 +304,8 @@ void SceneDashboard::render() {
         obj->draw();
     }
 
-    // 3. Sidebar
+    // 3. Sidebar (which calls drawPlayerMenu)
     drawSidebar();
-    
-    // 3.1 Draw Player Names (Optimized: Create Text objects once, but here we hack for demo)
-    // To do this properly without leaks in render loop:
-    // I should have created a vector<Text*> m_playerTextObjects in onEnter.
-    // Let's do a quick fix: I'll just draw them using a static helper if I had one.
-    // Since I don't, I'll rely on the fact that I didn't implement the text drawing in drawSidebar yet.
-    // Let's add the text objects to m_uiObjects in onEnter? 
-    // No, they need to be in the sidebar.
-    
-    // REAL FIX: Render the text using a temporary surface/texture is slow but works for 5 items.
-    // Better: Add them to a separate list in onEnter.
-    
-    int sidebarX = 1280 - 300 + 20;
-    int startY = 100;
-    // This is just a placeholder loop to show where they would be. 
-    // In a real engine, we'd have a ListView component.
-    // For this assignment, I will assume we added them to m_uiObjects but positioned them in the sidebar.
-    
-    // 4. Popup Menu
-    drawPlayerMenu();
 }
 
 bool SceneDashboard::onExit() {
@@ -262,6 +315,13 @@ bool SceneDashboard::onExit() {
     }
     m_uiObjects.clear();
     
+    // Clean dynamic texts
+    for (auto t : m_playerListTexts) {
+        t->clean();
+        delete t;
+    }
+    m_playerListTexts.clear();
+
     if (m_btnChallenge) { m_btnChallenge->clean(); delete m_btnChallenge; }
     if (m_btnProfile) { m_btnProfile->clean(); delete m_btnProfile; }
     if (m_lblChallenge) { m_lblChallenge->clean(); delete m_lblChallenge; }

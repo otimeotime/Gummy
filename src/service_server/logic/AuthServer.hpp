@@ -23,7 +23,10 @@ public:
     bool reg(const std::string& username, const std::string& password, long& outUserId);
 
     bool changePassword(long userId, const std::string& newPassword);
+
+    std::vector<UserData> getAllUsers();
     
 };
+
 
 #endif // AUTHSERVER_HPP

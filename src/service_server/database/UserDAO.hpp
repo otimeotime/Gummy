@@ -26,6 +26,8 @@ public:
 
     long createUser(const std::string& username, const std::string& password);
 
+    std::vector<UserData> getAllUsers();
+
     std::optional<UserData> authenticate(const std::string& username, const std::string& password);
 
     bool updateElo(long userId, int newElo);

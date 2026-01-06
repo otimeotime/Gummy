@@ -49,11 +49,13 @@ public:
         m_text->draw();
 
         // Draw Underline
-        SDL_SetRenderDrawColor(Game::getInstance()->getRenderer(), 0, 0, 255, 255);
         int lineY = (int)m_position.y + m_height; 
-        SDL_RenderDrawLine(Game::getInstance()->getRenderer(), 
-                           (int)m_position.x, lineY, 
-                           (int)m_position.x + m_width, lineY);
+        TextureManager::getInstance()->drawLine(
+            (int)m_position.x, lineY, 
+            (int)m_position.x + m_width, lineY, 
+            0, 0, 255, 255, 
+            Game::getInstance()->getRenderer()
+        );
         
         // Draw Button (Invisible)
         m_button->draw();

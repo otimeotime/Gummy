@@ -4,6 +4,8 @@
 #include <vector>
 #include <thread>
 #include <atomic>
+#include <mutex>
+#include <unordered_set>
 #include "../../common/network/TCPSocket.hpp"
 #include "../logic/AuthServer.hpp" 
 
@@ -14,7 +16,11 @@ private:
     
     AuthServer mAuthServer;
 
+    std::mutex mClientsMutex;
+    std::unordered_set<std::string> mConnectedUsers;
+
     void HandleClient(TCPSocket* clientSocket);
+
 
 public:
     ServiceServer();
