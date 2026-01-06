@@ -22,6 +22,12 @@ CLIENT_BIN="./net_game_client"
 LOG_DIR="$ROOT_DIR/logs"
 mkdir -p "$LOG_DIR"
 
+TS="$(date +"%Y%m%d_%H%M%S")"
+SERVER_LOG="$LOG_DIR/ingame_server_${TS}.log"
+CLIENT1_LOG="$LOG_DIR/ingame_client1_${TS}.log"
+CLIENT2_LOG="$LOG_DIR/ingame_client2_${TS}.log"
+REPLAY_OUT="$LOG_DIR/replay_ingame_${TS}.grpl"
+
 cleanup() {
   set +e
   echo "Stopping clients/server..."
@@ -42,28 +48,14 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-need_build=0
 if [[ ! -x "$SERVER_BIN" || ! -x "$CLIENT_BIN" ]]; then
-  need_build=1
-else
-  # Rebuild when sources are newer than binaries.
-  if ! make -q server client; then
-    need_build=1
-  fi
-fi
-
-if [[ "$need_build" -eq 1 ]]; then
-  echo "Building server/client..."
-  make server client -j
-fi
-
-if [[ ! -x "$SERVER_BIN" || ! -x "$CLIENT_BIN" ]]; then
-  echo "ERROR: missing binaries after build. Expected $SERVER_BIN and $CLIENT_BIN" >&2
+  echo "ERROR: missing binaries. Expected $SERVER_BIN and $CLIENT_BIN" >&2
+  echo "Build once with: make server client -j" >&2
   exit 1
 fi
 
-echo "Starting server on port $PORT..."
-"$SERVER_BIN" "$PORT" >"$LOG_DIR/ingame_server_demo.log" 2>&1 &
+echo "Starting server on port $PORT (recording to $REPLAY_OUT)..."
+"$SERVER_BIN" --port "$PORT" --record "$REPLAY_OUT" >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 
 # Wait for TCP port to accept connections.
@@ -91,12 +83,12 @@ for _ in {1..50}; do
 done
 
 echo "Launching 2 clients (close a window or Ctrl+C here to stop all)..."
-"$CLIENT_BIN" "$IP" "$PORT" "$MAP_PATH" >"$LOG_DIR/client1.log" 2>&1 &
+"$CLIENT_BIN" "$IP" "$PORT" "$MAP_PATH" >"$CLIENT1_LOG" 2>&1 &
 CLIENT1_PID=$!
 
 sleep 0.3
 
-"$CLIENT_BIN" "$IP" "$PORT" "$MAP_PATH" >"$LOG_DIR/client2.log" 2>&1 &
+"$CLIENT_BIN" "$IP" "$PORT" "$MAP_PATH" >"$CLIENT2_LOG" 2>&1 &
 CLIENT2_PID=$!
 
 # Wait until any client exits, then cleanup via trap.

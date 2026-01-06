@@ -37,6 +37,32 @@ enum PacketType {
     RES_INGAME_JOIN,
     REQ_INGAME_INPUT,
     RES_INGAME_STATE,
+
+    // In-game pause (authoritative ingame server)
+    REQ_INGAME_PAUSE_REQUEST,
+    RES_INGAME_PAUSE_RESULT,
+    RES_INGAME_PAUSE_SIGNAL,
+    REQ_INGAME_PAUSE_END_EARLY,
+    RES_INGAME_PAUSE_END,
+
+    // In-game draw offer (authoritative ingame server)
+    REQ_INGAME_DRAW_REQUEST,
+    RES_INGAME_DRAW_SIGNAL,
+    REQ_INGAME_DRAW_DECISION,
+    RES_INGAME_DRAW_RESULT,
+
+    // In-game surrender (authoritative ingame server)
+    REQ_INGAME_SURRENDER,
+    RES_INGAME_SURRENDER_RESULT,
+
+    // In-game rematch handshake (authoritative ingame server)
+    REQ_INGAME_REMATCH_REQUEST,
+    RES_INGAME_REMATCH_STATUS,
+
+    // Replay control (for replay-mode ingame server)
+    REQ_REPLAY_CONTROL,
+    RES_REPLAY_STATUS,
+    RES_REPLAY_INFO,
 };
 
 #endif // PACKET_TYPE_HPP

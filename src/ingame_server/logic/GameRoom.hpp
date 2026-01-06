@@ -131,6 +131,26 @@ public:
 
     RoomState getState() const { return m_state; }
 
+    void endGameAsDraw() {
+        m_state = GAME_OVER;
+        for (auto* p : m_players) {
+            if (p) p->setTurn(false);
+        }
+    }
+
+    void endGameBySurrender(int surrenderingPlayerId) {
+        // Mark the surrendering player as dead, then end the match.
+        for (auto* p : m_players) {
+            if (p && p->getId() == surrenderingPlayerId && p->isAlive()) {
+                p->takeDamage(1000000);
+            }
+        }
+        m_state = GAME_OVER;
+        for (auto* p : m_players) {
+            if (p) p->setTurn(false);
+        }
+    }
+
     Player* getCurrentPlayer() const {
         if (m_players.empty()) return nullptr;
         return m_players[m_currentTurnIndex];

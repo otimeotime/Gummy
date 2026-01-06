@@ -28,6 +28,16 @@ public:
     void requestPopState();
     void requestReplaceAll(GameState* pState);
 
+    // Pop multiple states safely at end of frame.
+    void requestPopStates(int count);
+
+    // Pop multiple states, then push a new state (e.g., pop Terminal+Game, then push a fresh Game).
+    void requestPopStatesAndPush(int count, GameState* pState);
+
+    // Inspect a state below the top of the stack.
+    // offsetFromTop=0 returns the current top, 1 returns the state just below it, etc.
+    GameState* peekStateFromTop(int offsetFromTop);
+
 private:
     std::vector<GameState*> m_gameStates;
     enum class PendingOp {
@@ -35,14 +45,18 @@ private:
         Push,
         Change,
         Pop,
-        ReplaceAll
+        ReplaceAll,
+        PopMany,
+        PopManyPush
     };
     GameState* m_pendingState = nullptr;
     bool m_isChanging = false;
     bool m_isPopping = false;
     PendingOp m_pendingOp = PendingOp::None;
+    int m_pendingPopCount = 0;
     GameState* getCurrentState();
     
 
     void applyPending();
+    void popOneImmediate();
 };

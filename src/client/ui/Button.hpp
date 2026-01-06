@@ -1,5 +1,6 @@
 #pragma once
 #include "UIObject.hpp"
+#include <SDL2/SDL.h>
 #include <functional>
 #include <string>
 
@@ -18,6 +19,12 @@ public:
     virtual void update() override;
     virtual void clean() override;
 
+    void setEnabled(bool enabled) { m_enabled = enabled; }
+    bool isEnabled() const { return m_enabled; }
+
+    void setAlpha(Uint8 alpha) { m_alpha = alpha; }
+    Uint8 getAlpha() const { return m_alpha; }
+
 private:
     // Button visual states
     enum button_state {
@@ -34,4 +41,7 @@ private:
 
     int m_srcWidth;
     int m_srcHeight;
+
+    bool m_enabled = true;
+    Uint8 m_alpha = 255;
 };

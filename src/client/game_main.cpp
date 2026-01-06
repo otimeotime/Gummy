@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstring>
 #include <iostream>
+#include <sstream>
 #include <thread>
 
 namespace {
@@ -13,6 +14,64 @@ std::atomic<bool> g_running{true};
 std::atomic<uint32_t> g_playerId{UINT32_MAX};
 std::atomic<bool> g_myTurn{false};
 std::atomic<uint32_t> g_roomState{0};
+std::atomic<bool> g_spectateOnly{false};
+std::atomic<bool> g_enableReplayControl{false};
+
+void SendReplayControl(TCPSocket* sock, ReplayControlCommand cmd, uint32_t tick, float value) {
+    ReqReplayControl c{};
+    c.command = (uint32_t)cmd;
+    c.tick = tick;
+    c.value = value;
+    PacketUtils::SendPacket(sock, PacketType::REQ_REPLAY_CONTROL, c);
+}
+
+void ControlLoop(TCPSocket* sock) {
+    // Commands:
+    //   p            -> toggle pause
+    //   speed <x>     -> set speed (e.g. 0.5, 1, 2, 4)
+    //   seek <tick>   -> jump to absolute tick
+    //   help         -> print help
+    bool paused = false;
+
+    std::cout << "Replay controls enabled. Type: help" << std::endl;
+    std::string line;
+    while (g_running && std::getline(std::cin, line)) {
+        std::istringstream iss(line);
+        std::string cmd;
+        iss >> cmd;
+        if (cmd.empty()) continue;
+
+        if (cmd == "help") {
+            std::cout << "Commands:\n"
+                      << "  p\n"
+                      << "  speed <x>\n"
+                      << "  seek <tick>\n";
+            continue;
+        }
+
+        if (cmd == "p") {
+            paused = !paused;
+            SendReplayControl(sock, REPLAY_CMD_SET_PAUSED, 0, paused ? 1.0f : 0.0f);
+            continue;
+        }
+
+        if (cmd == "speed") {
+            float sp = 1.0f;
+            iss >> sp;
+            SendReplayControl(sock, REPLAY_CMD_SET_SPEED, 0, sp);
+            continue;
+        }
+
+        if (cmd == "seek") {
+            uint32_t t = 0;
+            iss >> t;
+            SendReplayControl(sock, REPLAY_CMD_SEEK_TICK, t, 0.0f);
+            continue;
+        }
+
+        std::cout << "Unknown command. Type: help" << std::endl;
+    }
+}
 
 void ReceiverLoop(TCPSocket* sock) {
     uint32_t lastPrintedTick = 0;
@@ -26,9 +85,17 @@ void ReceiverLoop(TCPSocket* sock) {
             break;
         }
 
-        if (p.header.type != PacketType::RES_INGAME_STATE) {
+        if (p.header.type == PacketType::RES_REPLAY_STATUS) {
+            ResReplayStatus st = p.GetPayload<ResReplayStatus>();
+            std::cout << "replay: tick=" << st.currentTick
+                      << " range=[" << st.firstTick << "," << st.lastTick << "]"
+                      << " paused=" << (st.isPaused ? "yes" : "no")
+                      << " speed=" << st.speed
+                      << std::endl;
             continue;
         }
+
+        if (p.header.type != PacketType::RES_INGAME_STATE) continue;
 
         ResIngameState s = p.GetPayload<ResIngameState>();
         g_roomState = s.roomState;
@@ -78,6 +145,11 @@ int main(int argc, char** argv) {
     int port = 9090;
     if (argc >= 2) ip = argv[1];
     if (argc >= 3) port = std::atoi(argv[2]);
+    for (int i = 3; i < argc; i++) {
+        const std::string a = argv[i];
+        if (a == "--spectate") g_spectateOnly = true;
+        if (a == "--control") g_enableReplayControl = true;
+    }
 
     try {
         TCPSocket sock;
@@ -106,6 +178,22 @@ int main(int argc, char** argv) {
         std::cout << "Joined match " << joined.matchId << " as player " << joined.playerId << std::endl;
 
         std::thread rx(ReceiverLoop, &sock);
+
+        std::thread ctl;
+        if (g_enableReplayControl.load()) {
+            ctl = std::thread(ControlLoop, &sock);
+        }
+
+        if (g_spectateOnly.load() || joined.playerId == UINT32_MAX) {
+            // Spectator mode: no gameplay inputs, just receive state + optional replay controls.
+            while (g_running) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
+
+            if (ctl.joinable()) ctl.join();
+            if (rx.joinable()) rx.join();
+            return 0;
+        }
 
         // Simple demo input loop:
         // - If it's our turn, charge power for ~1s then FIRE.
@@ -157,6 +245,7 @@ int main(int argc, char** argv) {
         }
 
         if (rx.joinable()) rx.join();
+        if (ctl.joinable()) ctl.join();
         return 0;
 
     } catch (const std::exception& e) {

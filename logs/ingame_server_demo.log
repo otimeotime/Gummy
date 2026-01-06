@@ -1,9 +1,0 @@
-GameServer listening on port 9090
-GameServer accepted connection.
-GameServer accepted connection.
-GameServer accepted connection.
-Game Started! Player 0's turn.
-Wind set to: 0.1
-Wind set to: 0.257
-
-SIGINT: stopping GameServer...

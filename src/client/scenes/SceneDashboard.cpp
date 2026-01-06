@@ -1,9 +1,84 @@
 #include "SceneDashboard.hpp"
 #include "SceneLogin.hpp"
+#include "SceneGame.hpp"
 #include "../core/Game.hpp"
 #include "../core/TextureManager.hpp"
 #include "../core/InputHandler.hpp"
 #include <iostream>
+#include <cstring>
+#include <string>
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <unistd.h>
+#include <sys/types.h>
+#endif
+
+namespace {
+void LaunchIngameClientProcess(const std::string& host, int port, const std::string& mapPath, const std::string& username) {
+#if defined(__unix__) || defined(__APPLE__)
+    pid_t pid = fork();
+    if (pid < 0) {
+        std::perror("fork(net_game_client)");
+        return;
+    }
+    if (pid == 0) {
+        const std::string portStr = std::to_string(port);
+        if (username.empty()) {
+            execl("./net_game_client", "./net_game_client", host.c_str(), portStr.c_str(), mapPath.c_str(), (char*)nullptr);
+        } else {
+            execl("./net_game_client",
+                  "./net_game_client",
+                  host.c_str(),
+                  portStr.c_str(),
+                  mapPath.c_str(),
+                  username.c_str(),
+                  (char*)nullptr);
+        }
+        std::perror("execl(net_game_client)");
+        _exit(127);
+    }
+#else
+    // Fallback: best-effort
+    std::string cmd = "./net_game_client \"" + host + "\" " + std::to_string(port) + " \"" + mapPath + "\"";
+    if (!username.empty()) {
+        cmd += " \"" + username + "\"";
+    }
+    cmd += " &";
+    std::system(cmd.c_str());
+#endif
+}
+
+void LaunchReplayViewerProcess(const std::string& replayPath, const std::string& username) {
+#if defined(__unix__) || defined(__APPLE__)
+    pid_t pid = fork();
+    if (pid < 0) {
+        std::perror("fork(run_replay_viewer.sh)");
+        return;
+    }
+    if (pid == 0) {
+        if (username.empty()) {
+            execl("./run_replay_viewer.sh", "./run_replay_viewer.sh", replayPath.c_str(), (char*)nullptr);
+        } else {
+            execl("./run_replay_viewer.sh",
+                  "./run_replay_viewer.sh",
+                  replayPath.c_str(),
+                  "--username",
+                  username.c_str(),
+                  (char*)nullptr);
+        }
+        std::perror("execl(run_replay_viewer.sh)");
+        _exit(127);
+    }
+#else
+    std::string cmd = "./run_replay_viewer.sh \"" + replayPath + "\"";
+    if (!username.empty()) {
+        cmd += " --username \"" + username + "\"";
+    }
+    cmd += " &";
+    std::system(cmd.c_str());
+#endif
+}
+}
 
 SceneDashboard::SceneDashboard(std::string username) 
     : m_username(username), m_showPlayerMenu(false), 
@@ -13,7 +88,7 @@ SceneDashboard::SceneDashboard(std::string username)
       m_isSearching(false), m_searchStartTime(0),
       m_btnFindMatch(nullptr), m_lblFindMatch(nullptr),
       m_btnCancelSearch(nullptr), m_lblSearchingTimer(nullptr),
-      m_showMatchPopup(false), m_hasMatchDecision(false), 
+      m_showMatchPopup(false), m_hasMatchDecision(false), m_pendingMatchId(0),
       m_btnAccept(nullptr), m_btnDecline(nullptr), m_lblMatchFound(nullptr),
       m_lblAccept(nullptr), m_lblDecline(nullptr), m_lblMatchStatus(nullptr)
 {
@@ -95,6 +170,31 @@ bool SceneDashboard::onEnter() {
 
     m_lblSearchingTimer = new Text(centerX - 100, centerY - 20, "assets/Arial.ttf", 24, "Searching... 00:00", {255, 255, 0, 255});
 
+    // --- REPLAY WATCH (single-user) ---
+    // Start the replay viewer directly (it will start the replay server internally).
+    const int replayY = centerY + 140;
+    m_lblReplayTitle = new Text(centerX - 120, replayY - 70, "assets/Arial.ttf", 20, "WATCH REPLAY", {255, 255, 0, 255});
+    m_uiObjects.push_back(m_lblReplayTitle);
+
+    m_lblReplayFile = new Text(centerX - 220, replayY - 40, "assets/Arial.ttf", 16, "Replay file", {255, 255, 255, 255});
+    m_uiObjects.push_back(m_lblReplayFile);
+    m_inReplayFile = new TextInput(centerX - 220, replayY - 18, 520, 34, "assets/Arial.ttf", 16);
+    m_uiObjects.push_back(m_inReplayFile);
+
+    m_btnWatchReplay = new Button(centerX + 320, replayY - 18, 140, 34, "btn_generic", [this]() {
+        if (!m_inReplayFile) return;
+        const std::string replayPath = m_inReplayFile->getString();
+        if (replayPath.empty()) {
+            std::cout << "[SceneDashboard] Replay path is empty." << std::endl;
+            return;
+        }
+        std::cout << "[SceneDashboard] Launching replay viewer for: " << replayPath << std::endl;
+        LaunchReplayViewerProcess(replayPath, m_username);
+    }, 181, 73);
+    m_uiObjects.push_back(m_btnWatchReplay);
+    m_lblWatchReplay = new Text(centerX + 335, replayY - 10, "assets/Arial.ttf", 16, "WATCH", {0, 0, 0, 255});
+    m_uiObjects.push_back(m_lblWatchReplay);
+
     // --- POPUP MENU BUTTONS (Hidden initially) ---
     // ... (Existing code) ...
 
@@ -107,7 +207,7 @@ bool SceneDashboard::onEnter() {
     
     m_btnAccept = new Button(centerX - 110, centerY, 100, 40, "btn_generic", [this]() {
          std::cout << "Accepted Match!" << std::endl;
-         Game::getInstance()->getClientSocket()->SendMatchDecision(true);
+            Game::getInstance()->getClientSocket()->SendMatchDecision(true, m_pendingMatchId);
          m_hasMatchDecision = true;
          m_lblMatchStatus->setText("Waiting for opponent...");
          m_lblMatchStatus->setColor({255, 255, 0, 255});
@@ -115,7 +215,7 @@ bool SceneDashboard::onEnter() {
     
     m_btnDecline = new Button(centerX + 10, centerY, 100, 40, "btn_generic", [this]() {
          std::cout << "Declined Match!" << std::endl;
-         Game::getInstance()->getClientSocket()->SendMatchDecision(false);
+            Game::getInstance()->getClientSocket()->SendMatchDecision(false, m_pendingMatchId);
          // m_showMatchPopup = false; // Maybe wait for server? Or just close?
          // If declined, server cancels match for both.
          m_hasMatchDecision = true;
@@ -203,6 +303,8 @@ void SceneDashboard::update() {
         }
         else if (packet.header.type == PacketType::REQ_MATCH_DECIDE_1) {
             std::cout << "[Dashboard] Match Found! Displaying popup." << std::endl;
+            ReqMatchDecide1 req = packet.GetPayload<ReqMatchDecide1>();
+            m_pendingMatchId = req.matchId;
             m_isSearching = false;
             m_showMatchPopup = true;
             m_hasMatchDecision = false;
@@ -212,6 +314,32 @@ void SceneDashboard::update() {
              // TODO: Transition to SceneGame
              // ResMatchDecide2 has playerOrder info
         }
+           else if (packet.header.type == PacketType::INIT_GAME) {
+              InitGame init = packet.GetPayload<InitGame>();
+
+              std::string host = init.host;
+              if (host.empty()) host = "127.0.0.1";
+              if (init.port == 0) {
+                  std::cout << "[Dashboard] INIT_GAME has port=0; ignoring (bad packet)" << std::endl;
+                  m_showMatchPopup = false;
+                  m_hasMatchDecision = false;
+                  return;
+              }
+              int port = (int)init.port;
+              std::string mapPath = init.mapPath;
+              if (mapPath.empty()) mapPath = "assets/maps/flatmap.txt";
+
+              std::cout << "[Dashboard] INIT_GAME received. Launching gameplay client: "
+                      << host << ":" << port << " map=" << mapPath << std::endl;
+
+                  const uint32_t myUserId = Game::getInstance()->getClientSocket()->GetUserId();
+
+                  // Run gameplay inside this process so we can return to Dashboard after the match.
+                  Game::getInstance()->getStateMachine()->pushState(new SceneGame(host, port, mapPath, m_username, init.matchId, myUserId));
+              m_showMatchPopup = false;
+              m_hasMatchDecision = false;
+              return;
+           }
         else if (packet.header.type == PacketType::RES_MATCH_CANCEL) {
              m_isSearching = false;
              m_showMatchPopup = false; 
@@ -483,6 +611,9 @@ bool SceneDashboard::onExit() {
     if (m_lblFindMatch) { m_lblFindMatch->clean(); delete m_lblFindMatch; }
     if (m_btnCancelSearch) { m_btnCancelSearch->clean(); delete m_btnCancelSearch; }
     if (m_lblSearchingTimer) { m_lblSearchingTimer->clean(); delete m_lblSearchingTimer; }
+
+    // Replay watch cleanup (if not already owned by m_uiObjects)
+    // Note: these were added to m_uiObjects, so they are already deleted above.
     
     return true;
 }

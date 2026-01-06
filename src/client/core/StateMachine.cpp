@@ -34,6 +34,34 @@ void StateMachine::requestReplaceAll(GameState* pState) {
     m_pendingOp = PendingOp::ReplaceAll;
 }
 
+void StateMachine::requestPopStates(int count) {
+    if (count <= 0) return;
+    if (m_pendingState) {
+        delete m_pendingState;
+        m_pendingState = nullptr;
+    }
+    m_pendingPopCount = count;
+    m_pendingOp = PendingOp::PopMany;
+}
+
+void StateMachine::requestPopStatesAndPush(int count, GameState* pState) {
+    if (count < 0) count = 0;
+    if (m_pendingState && m_pendingState != pState) {
+        delete m_pendingState;
+    }
+    m_pendingState = pState;
+    m_pendingPopCount = count;
+    m_pendingOp = PendingOp::PopManyPush;
+}
+
+void StateMachine::popOneImmediate() {
+    if (m_gameStates.empty()) return;
+    if (m_gameStates.back()->onExit()) {
+        delete m_gameStates.back();
+        m_gameStates.pop_back();
+    }
+}
+
 void StateMachine::applyPending() {
     switch (m_pendingOp) {
         case PendingOp::None:
@@ -41,6 +69,23 @@ void StateMachine::applyPending() {
         case PendingOp::Pop:
             popState();
             break;
+        case PendingOp::PopMany: {
+            const int toPop = m_pendingPopCount;
+            m_pendingPopCount = 0;
+            for (int i = 0; i < toPop; i++) {
+                popOneImmediate();
+            }
+        } break;
+        case PendingOp::PopManyPush: {
+            const int toPop = m_pendingPopCount;
+            m_pendingPopCount = 0;
+            for (int i = 0; i < toPop; i++) {
+                popOneImmediate();
+            }
+            GameState* s = m_pendingState;
+            m_pendingState = nullptr;
+            if (s) pushState(s);
+        } break;
         case PendingOp::Push: {
             GameState* s = m_pendingState;
             m_pendingState = nullptr;
@@ -136,4 +181,11 @@ void StateMachine::clean() {
         m_pendingState = nullptr;
     }
     m_pendingOp = PendingOp::None;
+}
+
+GameState* StateMachine::peekStateFromTop(int offsetFromTop) {
+    if (offsetFromTop < 0) return nullptr;
+    const int idx = (int)m_gameStates.size() - 1 - offsetFromTop;
+    if (idx < 0 || idx >= (int)m_gameStates.size()) return nullptr;
+    return m_gameStates[(size_t)idx];
 }

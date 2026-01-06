@@ -19,10 +19,15 @@ usage() {
   cat <<'USAGE'
 Usage:
   ./run_service_stack.sh [--no-build] [--delay SECONDS]
+  ./run_service_stack.sh <replay.grpl> [--no-build]
 
 Starts:
   - 1x ./service_server_app
   - 2x ./service_client
+
+Replay mode:
+  - If you pass a .grpl path, this script starts the replay viewer in the background
+    and exits immediately.
 
 Notes:
   - Clients are SDL GUI apps; they will open two windows.
@@ -32,6 +37,7 @@ USAGE
 
 DO_BUILD=1
 DELAY_SECONDS=1
+REPLAY_PATH=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -52,17 +58,68 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "[Error] Unknown arg: $1" >&2
-      usage >&2
-      exit 2
+      if [[ -z "$REPLAY_PATH" && -f "$1" && "$1" == *.grpl ]]; then
+        REPLAY_PATH="$1"
+        shift
+      else
+        echo "[Error] Unknown arg: $1" >&2
+        usage >&2
+        exit 2
+      fi
       ;;
   esac
 done
 
+if [[ -n "$REPLAY_PATH" ]]; then
+  # Replay-only helper mode: launch the viewer in background and exit.
+  if [[ ! -f "$REPLAY_PATH" ]]; then
+    echo "[Error] Replay file not found: $REPLAY_PATH" >&2
+    exit 1
+  fi
+
+  if [[ $DO_BUILD -eq 1 ]]; then
+    if [[ ! -x "$SCRIPT_DIR/ingame_server_demo" || ! -x "$SCRIPT_DIR/net_game_client" ]]; then
+      echo "[Info] Building server + viewer via make..."
+      make server client -j
+    fi
+  fi
+
+  # Pick a free replay port to avoid conflicts (e.g., service ingame server uses 9090).
+  PICKED_PORT=""
+  for p in 9090 9091 9092 9093 9094 9095 9096 9097 9098 9099; do
+    if (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; then
+      exec 3>&-; exec 3<&-;
+      continue
+    fi
+    PICKED_PORT="$p"
+    break
+  done
+  if [[ -z "$PICKED_PORT" ]]; then
+    echo "[Error] Could not find a free port in 9090-9099 for replay." >&2
+    exit 1
+  fi
+
+  LAUNCH_LOG="$LOG_DIR/replay_launch_${TS}.log"
+  echo "[Info] Starting replay in background: $REPLAY_PATH"
+  echo "[Info] Using port: $PICKED_PORT"
+  echo "[Info] Launch log: $LAUNCH_LOG"
+
+  if [[ $DO_BUILD -eq 1 ]]; then
+    ( PORT="$PICKED_PORT" ./run_replay_viewer.sh "$REPLAY_PATH" ) >"$LAUNCH_LOG" 2>&1 &
+  else
+    ( PORT="$PICKED_PORT" ./run_replay_viewer.sh --no-build "$REPLAY_PATH" ) >"$LAUNCH_LOG" 2>&1 &
+  fi
+
+  echo "[Info] Replay launcher PID: $!"
+  # Best-effort detach so Ctrl+C in this shell doesn't affect the replay.
+  disown || true
+  exit 0
+fi
+
 if [[ $DO_BUILD -eq 1 ]]; then
   if [[ ! -x "$SERVER_BIN" || ! -x "$CLIENT_BIN" ]]; then
     echo "[Info] Building service server + client via make..."
-    make service_server service_client
+    make service_server service_client server client
   fi
 fi
 
@@ -100,7 +157,17 @@ cleanup() {
 trap cleanup INT TERM EXIT
 
 echo "[Info] Starting service server..."
-( stdbuf -oL -eL "$SERVER_BIN" ) >"$SERVER_LOG" 2>&1 &
+( 
+  # If something is already listening on 127.0.0.1:8080, starting will fail.
+  # We avoid auto-killing to prevent terminating unrelated services.
+  if (exec 3<>"/dev/tcp/127.0.0.1/8080") 2>/dev/null; then
+    exec 3>&-; exec 3<&-;
+    echo "[Error] Port 8080 is already in use. Stop the existing process and retry." >&2
+    echo "        Hint: ss -ltnp '( sport = :8080 )'" >&2
+    exit 1
+  fi
+)
+( REPLAY_SESSION_TS="$TS" REPLAY_DIR="$LOG_DIR" stdbuf -oL -eL "$SERVER_BIN" ) >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 PIDS+=("$SERVER_PID")
 echo "[Info] Server PID: $SERVER_PID (log: $SERVER_LOG)"

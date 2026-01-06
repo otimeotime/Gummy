@@ -8,6 +8,8 @@
 #include <unordered_set>
 #include <map>
 #include <chrono>
+#include <string>
+#include <sys/types.h>
 #include "../../common/network/TCPSocket.hpp"
 #include "../logic/AuthServer.hpp" 
 
@@ -46,9 +48,20 @@ private:
     std::vector<PendingMatch> mPendingMatches;
     uint32_t mNextMatchId;
 
+    // Ingame server handoff (spawn ingame_server_demo when a match starts)
+    std::mutex mIngameMutex;
+    pid_t mIngameServerPid;
+    std::string mIngameServerBin;
+    std::string mIngameHost;
+    int mIngamePort;
+    std::string mIngameMapPath;
+
     void HandleClient(TCPSocket* clientSocket);
     void ProcessMatchmaking();
     void CheckPendingMatches(); // Optional: Timeout logic
+
+    bool EnsureIngameServerRunning(uint32_t matchId, int* outPort);
+    void StopIngameServer();
 
 public:
     ServiceServer();

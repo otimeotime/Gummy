@@ -118,34 +118,40 @@ namespace PacketUtils {
 
     bool ReceivePacket(TCPSocket* socket, Packet& outPacket) {
         if (!socket || !socket->IsValid()) return false;
-        std::vector<char> headerBuffer(sizeof(Header));
-        
-        int bytesRead = socket->Receive(headerBuffer.data(), headerBuffer.size());
-        
-        if (bytesRead < static_cast<int>(sizeof(Header))) {
-            return false; 
-        }
+        auto receiveExact = [&](void* dst, size_t size) -> bool {
+            size_t totalReceived = 0;
+            while (totalReceived < size) {
+                int received = socket->Receive(static_cast<char*>(dst) + totalReceived, size - totalReceived);
+
+                // Non-blocking sockets may return -1 (EAGAIN/EWOULDBLOCK) via TCPSocket::Receive.
+                if (received < 0) {
+                    continue;
+                }
+                // 0 means closed or fatal error in this codebase.
+                if (received == 0) {
+                    return false;
+                }
+
+                totalReceived += static_cast<size_t>(received);
+            }
+            return true;
+        };
 
         Header header;
-        if (!ReadHeader(headerBuffer.data(), bytesRead, header)) {
+        if (!receiveExact(&header, sizeof(Header))) {
             return false;
         }
 
         std::vector<char> payloadBuffer;
         if (header.length > 0) {
             payloadBuffer.resize(header.length);
-            size_t totalReceived = 0;
-            while (totalReceived < header.length) {
-                int received = socket->Receive(payloadBuffer.data() + totalReceived, header.length - totalReceived);
-                if (received <= 0) {
-                    return false;
-                }
-                totalReceived += received;
+            if (!receiveExact(payloadBuffer.data(), header.length)) {
+                return false;
             }
         }
 
         outPacket.header = header;
-        outPacket.payload = payloadBuffer;
+        outPacket.payload = std::move(payloadBuffer);
         return true;
     }
 

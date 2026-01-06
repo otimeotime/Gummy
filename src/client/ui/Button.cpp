@@ -33,12 +33,17 @@ void Button::draw() {
         m_currentFrame, // Frame index (0, 1, or 2)
         Game::getInstance()->getRenderer(),
         0,              // Angle
-        255,            // Alpha
+        m_alpha,        // Alpha
         SDL_FLIP_NONE
     );
 }
 
 void Button::update() {
+    if (!m_enabled) {
+        m_currentFrame = MOUSE_OUT;
+        m_bReleased = true;
+        return;
+    }
     Vector2D* mousePos = InputHandler::getInstance()->getMousePosition();
 
     // Check for AABB Collision (Mouse is INSIDE the button rectangle or not)

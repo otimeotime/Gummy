@@ -3,6 +3,7 @@
 #include "../ui/UIObject.hpp"
 #include "../ui/Text.hpp"
 #include "../ui/Button.hpp"
+#include "../ui/TextInput.hpp"
 #include <vector>
 #include <string>
 #include "../network/ClientSocket.hpp" // For PlayerStatusInfo and PacketStructs if needed. Accessing PacketStructs via ClientSocket usually, but needed for PlayerStatusInfo type.
@@ -53,12 +54,20 @@ private:
     // Matchmaking Popup
     bool m_showMatchPopup;
     bool m_hasMatchDecision; // If true, disable buttons
+    uint32_t m_pendingMatchId;
     Button* m_btnAccept;
     Button* m_btnDecline;
     Text* m_lblMatchFound;
     Text* m_lblAccept;
     Text* m_lblDecline;
     Text* m_lblMatchStatus; // "Waiting for opponent..."
+
+    // Replay watch UI (launch a replay-mode ingame server session viewer)
+    Text* m_lblReplayTitle = nullptr;
+    Text* m_lblReplayFile = nullptr;
+    TextInput* m_inReplayFile = nullptr;
+    Button* m_btnWatchReplay = nullptr;
+    Text* m_lblWatchReplay = nullptr;
 
     void drawSidebar();
     void drawPlayerMenu();

@@ -18,6 +18,8 @@ class ClientSocket {
 private:
     TCPSocket* mSocket;
     bool mIsConnected;
+    uint32_t mUserId = 0;
+    std::string mUsername;
 
 public:
     ClientSocket();
@@ -33,11 +35,14 @@ public:
     bool ChangePassword(const std::string& currentPassword, const std::string& newPassword);
     void Logout();
     bool IsConnected() const { return mIsConnected; }
+
+    uint32_t GetUserId() const { return mUserId; }
+    const std::string& GetUsername() const { return mUsername; }
     
     // Matchmaking
     bool SendFindMatch();
     bool SendCancelMatch();
-    bool SendMatchDecision(bool accepted);
+    bool SendMatchDecision(bool accepted, uint32_t matchId);
     bool CheckNotifications(Packet& outPacket);
 };
 

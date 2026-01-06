@@ -14,6 +14,8 @@ typedef struct {
 typedef struct {
     bool isLogin;
     bool isSuccess;
+    uint32_t userId;
+    int32_t elo;
     char message[100];
 } ResAuthenticate;
 
@@ -99,6 +101,7 @@ typedef struct {
 } ReqMatchDecide1; // This is Request from server to client, not vice versa
 
 typedef struct {
+    uint32_t matchId;
     bool isSuccess;
 } ResMatchDecide1; // This is Response from client to server, not vice versa
 
@@ -109,7 +112,9 @@ typedef struct {
 
 typedef struct {
     uint32_t matchId;
-    char gameData[2000]; // Placeholder for initial game data
+    char host[64];       // e.g. "127.0.0.1"
+    uint16_t port;       // ingame server TCP port
+    char mapPath[128];   // e.g. "assets/maps/flatmap.txt"
 } InitGame;
 // --------------------------------------------------------
 // In Game Packets ---------------------------------------
@@ -179,6 +184,7 @@ typedef struct {
 
 typedef struct {
     uint32_t id;
+    char name[32];
     int32_t hp;
     uint8_t isAlive;
     uint8_t isMyTurn;
@@ -213,6 +219,124 @@ typedef struct {
     NetPlayerState players[INGAME_MAX_PLAYERS];
     NetProjectileState projectiles[INGAME_MAX_PROJECTILES];
 } ResIngameState;
+
+// In-game pause packets -------------------------
+// Pausing is coordinated by the authoritative ingame server.
+
+typedef struct {
+    uint32_t matchId;
+} ReqIngamePauseRequest;
+
+typedef struct {
+    uint8_t isSuccess;
+    uint8_t remainingUses; // how many pauses the requester has left (0..3)
+    char message[100];
+} ResIngamePauseResult;
+
+// Broadcast to both players when a pause starts.
+typedef struct {
+    uint32_t matchId;
+    uint32_t requesterPlayerId;
+    uint32_t durationMs; // typically 30000
+    uint8_t requesterRemainingUses;
+} ResIngamePauseSignal;
+
+typedef struct {
+    uint32_t matchId;
+} ReqIngamePauseEndEarly;
+
+// Broadcast to both players when the pause ends (either naturally or early).
+typedef struct {
+    uint32_t matchId;
+    uint32_t endedByPlayerId; // UINT32_MAX means ended by timeout
+} ResIngamePauseEnd;
+
+// In-game draw offer packets -------------------------
+
+typedef struct {
+    uint32_t matchId;
+} ReqIngameDrawRequest;
+
+// In-game rematch handshake -------------------------
+
+typedef struct {
+    uint32_t matchId;
+} ReqIngameRematchRequest;
+
+// status: 0 waiting, 1 start, 2 timeout/failed
+typedef struct {
+    uint8_t status;
+    uint8_t acceptedMask; // bit i = player i has accepted
+    uint16_t reserved;
+    char message[64];
+} ResIngameRematchStatus;
+
+// Broadcast to both players when a draw offer is active.
+typedef struct {
+    uint32_t matchId;
+    uint32_t requesterPlayerId;
+    uint32_t durationMs; // typically 10000
+} ResIngameDrawSignal;
+
+typedef struct {
+    uint32_t matchId;
+    uint8_t accept; // 0 = decline, 1 = accept
+} ReqIngameDrawDecision;
+
+typedef enum {
+    DRAW_RESULT_ACCEPTED = 0,
+    DRAW_RESULT_DECLINED = 1,
+    DRAW_RESULT_TIMEOUT = 2,
+    DRAW_RESULT_DENIED = 3,
+} IngameDrawResult;
+
+typedef struct {
+    uint32_t matchId;
+    uint32_t requesterPlayerId;
+    uint32_t responderPlayerId; // UINT32_MAX for timeout/denied
+    uint32_t result; // IngameDrawResult
+    char message[100];
+} ResIngameDrawResult;
+
+// In-game surrender packets -------------------------
+
+typedef struct {
+    uint32_t matchId;
+} ReqIngameSurrender;
+
+typedef struct {
+    uint8_t isSuccess;
+    char message[100];
+} ResIngameSurrenderResult;
+
+// Replay control packets -------------------------
+// These are only meaningful when the ingame server is started in replay mode.
+
+typedef enum {
+    REPLAY_CMD_SET_PAUSED = 0,   // value: 0 = play, 1 = pause
+    REPLAY_CMD_SET_SPEED = 1,    // value: playback speed (e.g. 0.5, 1.0, 2.0)
+    REPLAY_CMD_SEEK_TICK = 2,    // tick: absolute tick to jump to
+} ReplayControlCommand;
+
+typedef struct {
+    uint32_t command; // ReplayControlCommand
+    uint32_t tick;    // used by SEEK
+    float value;      // used by SET_PAUSED / SET_SPEED
+} ReqReplayControl;
+
+typedef struct {
+    uint32_t currentTick;
+    uint32_t firstTick;
+    uint32_t lastTick;
+    uint8_t isPaused;
+    float speed;
+} ResReplayStatus;
+
+// Sent by replay-mode ingame server after a spectator joins.
+// Allows the viewer to load the same map that was recorded.
+typedef struct {
+    char mapPath[256];
+} ResReplayInfo;
 #pragma pack(pop)
 // --------------------------------------------------------
 #endif // PACKET_STRUCTS_H

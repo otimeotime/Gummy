@@ -11,16 +11,18 @@ int main(int argc, char* argv[]) {
     std::string ip = "127.0.0.1";
     int port = 9090;
     std::string mapPath = "assets/maps/flatmap.txt";
+    std::string username;
 
     if (argc >= 2) ip = argv[1];
     if (argc >= 3) port = std::atoi(argv[2]);
     if (argc >= 4) mapPath = argv[3];
+    if (argc >= 5) username = argv[4];
 
     if (!Game::getInstance()->init("Gummy Network Client", 1280, 720)) {
         return -1;
     }
 
-    Game::getInstance()->getStateMachine()->pushState(new SceneGame(ip, port, mapPath));
+    Game::getInstance()->getStateMachine()->pushState(new SceneGame(ip, port, mapPath, username));
 
     Uint32 frameStart, frameTime;
 

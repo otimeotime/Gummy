@@ -135,7 +135,7 @@ public:
                     if (checkCollision(proj, p)) {
                         std::cerr << "Player " << p->getId() << " took damage" << std::endl;
                         proj.isActive = false;
-                        p->takeDamage(10); // Deal 10 damage on hit
+                        p->takeDamage(50); // Deal 50 damage on hit
                         break;
                     }
                 }

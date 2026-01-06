@@ -45,6 +45,8 @@ std::string ClientSocket::Login(const std::string& username, const std::string& 
     ResAuthenticate res;
     if (PacketUtils::ReceivePacketPayload(mSocket, res)) {
         if (res.isSuccess) {
+            mUserId = res.userId;
+            mUsername = username;
             return "Success";
         } else {
             return std::string(res.message);
@@ -69,6 +71,9 @@ std::string ClientSocket::Register(const std::string& username, const std::strin
     ResAuthenticate res;
     if (PacketUtils::ReceivePacketPayload(mSocket, res)) {
          if (res.isSuccess) {
+            // Registration does not start a session in the current UX, but keep id for convenience.
+            mUserId = res.userId;
+            mUsername = username;
             return "Success";
         } else {
             return std::string(res.message);
@@ -137,9 +142,10 @@ bool ClientSocket::SendFindMatch() {
     // Response RES_MATCH_FIND will be handled in CheckNotifications
 }
 
-bool ClientSocket::SendMatchDecision(bool accepted) {
+bool ClientSocket::SendMatchDecision(bool accepted, uint32_t matchId) {
     if (!mIsConnected) return false;
     ResMatchDecide1 res;
+    res.matchId = matchId;
     res.isSuccess = accepted;
     return PacketUtils::SendPacket(mSocket, PacketType::RES_MATCH_DECIDE_1, res);
 }

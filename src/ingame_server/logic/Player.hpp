@@ -36,6 +36,7 @@ public:
             m_power = 0.0f;
         }
     int getId() const { return m_id; }
+    const std::string& getName() const { return m_name; }
     Position getPosition() const { return m_position; }
     int getHP() const { return m_hp; }
     bool isAlive() const { return m_isAlive; }

@@ -15,6 +15,7 @@ void SignalHandler(int signum) {
 int main() {
     // Register signal handler for Ctrl+C
     signal(SIGINT, SignalHandler);
+    signal(SIGTERM, SignalHandler);
 
     std::cout << "Initializing Service Server..." << std::endl;
     
