@@ -6,6 +6,7 @@
 #include <string>
 #include <optional>
 #include <iostream>
+#include <mutex>
 
 // Updated UserData struct to include 'elo' and 'info'
 struct UserData {
@@ -18,6 +19,7 @@ struct UserData {
 class UserDAO {
 private:
     DatabaseServer* db;
+    std::mutex m_dbMutex;
 
 public:
     UserDAO(DatabaseServer* database);

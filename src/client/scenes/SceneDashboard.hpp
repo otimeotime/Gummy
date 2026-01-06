@@ -26,6 +26,14 @@ private:
     // Specific UI pointers for updates
     Text* m_lblWelcome;
 
+    // Searching State interaction (Searching...)
+    bool m_isSearching;
+    uint32_t m_searchStartTime;
+    Button* m_btnCancelSearch;
+    Text* m_lblSearchingTimer;
+    Button* m_btnFindMatch; 
+    Text* m_lblFindMatch;
+
     // Players List
     std::vector<PlayerStatusInfo> m_allPlayers;
     std::vector<Text*> m_playerListTexts; // Separate list for dynamic UI
@@ -42,8 +50,20 @@ private:
     Text* m_lblChallenge;
     Text* m_lblProfile;
 
+    // Matchmaking Popup
+    bool m_showMatchPopup;
+    bool m_hasMatchDecision; // If true, disable buttons
+    Button* m_btnAccept;
+    Button* m_btnDecline;
+    Text* m_lblMatchFound;
+    Text* m_lblAccept;
+    Text* m_lblDecline;
+    Text* m_lblMatchStatus; // "Waiting for opponent..."
+
     void drawSidebar();
     void drawPlayerMenu();
+    void drawMatchPopup();
+    void updateSearchingUI(); // New helper
     void handlePlayerListClick();
     bool isMouseInsideMenu(Vector2D* mousePos);
     void refreshPlayerList(); // New helper

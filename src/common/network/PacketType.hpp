@@ -20,6 +20,8 @@ enum PacketType {
     // Game Room Packets
     REQ_MATCH_FIND,
     RES_MATCH_FIND,
+    REQ_MATCH_CANCEL,
+    RES_MATCH_CANCEL,
     REQ_MATCH_DECIDE_1,
     RES_MATCH_DECIDE_1,
     RES_MATCH_DECIDE_2,

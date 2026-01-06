@@ -3,6 +3,7 @@
 UserDAO::UserDAO(DatabaseServer* database) : db(database) {}
 
 bool UserDAO::deleteUser(const u_int32_t userid) {
+    std::lock_guard<std::mutex> lock(m_dbMutex);
     try {
         pqxx::work W(*db->getConnection());
         std::string sql = "DELETE FROM \"User\" WHERE user_id = " + std::to_string(userid) + ";";
@@ -16,6 +17,7 @@ bool UserDAO::deleteUser(const u_int32_t userid) {
 }
 
 long UserDAO::createUser(const std::string& username, const std::string& password) {
+    std::lock_guard<std::mutex> lock(m_dbMutex);
     try {
         pqxx::work W(*db->getConnection());
         std::string sql = "INSERT INTO \"User\" (username, password) VALUES (" + 
@@ -32,6 +34,7 @@ long UserDAO::createUser(const std::string& username, const std::string& passwor
 }
 
 std::optional<UserData> UserDAO::authenticate(const std::string& username, const std::string& password) {
+    std::lock_guard<std::mutex> lock(m_dbMutex);
     try {
         pqxx::work W(*db->getConnection());
         std::string sql = "SELECT user_id, username, elo, COALESCE(info, '') "
@@ -57,6 +60,7 @@ std::optional<UserData> UserDAO::authenticate(const std::string& username, const
 }
 
 bool UserDAO::updateElo(long userId, int newElo) {
+    std::lock_guard<std::mutex> lock(m_dbMutex);
     try {
         pqxx::work W(*db->getConnection());
         
@@ -73,6 +77,7 @@ bool UserDAO::updateElo(long userId, int newElo) {
 }
 
 bool UserDAO::updatePassword(long userId, const std::string& newPassword) {
+    std::lock_guard<std::mutex> lock(m_dbMutex);
     try {
         pqxx::work W(*db->getConnection());
         
@@ -89,6 +94,7 @@ bool UserDAO::updatePassword(long userId, const std::string& newPassword) {
 }
 
 bool UserDAO::updateUsername(long userId, const std::string& newUsername) {
+    std::lock_guard<std::mutex> lock(m_dbMutex);
     try {
         pqxx::work W(*db->getConnection());
         
@@ -105,6 +111,7 @@ bool UserDAO::updateUsername(long userId, const std::string& newUsername) {
 }
 
 std::optional<UserData> UserDAO::getUserById(long userId) {
+    std::lock_guard<std::mutex> lock(m_dbMutex);
     try {
         pqxx::work W(*db->getConnection());
         std::string sql = "SELECT user_id, username, elo, COALESCE(password, '') FROM \"User\" WHERE user_id = " + std::to_string(userId);
@@ -125,6 +132,7 @@ std::optional<UserData> UserDAO::getUserById(long userId) {
 }
 
 std::vector<UserData> UserDAO::getAllUsers() {
+    std::lock_guard<std::mutex> lock(m_dbMutex);
     std::vector<UserData> users;
     try {
         pqxx::work W(*db->getConnection());

@@ -32,8 +32,13 @@ public:
 
     bool ChangePassword(const std::string& currentPassword, const std::string& newPassword);
     void Logout();
-    
     bool IsConnected() const { return mIsConnected; }
+    
+    // Matchmaking
+    bool SendFindMatch();
+    bool SendCancelMatch();
+    bool SendMatchDecision(bool accepted);
+    bool CheckNotifications(Packet& outPacket);
 };
 
 #endif // CLIENT_SOCKET_H

@@ -30,6 +30,7 @@ public:
     // Communication Methods
     bool Send(const void* data, size_t size);
     int Receive(void* buffer, size_t size);
+    bool HasData();
     // Utility Methods
     void Close();
     void SetNonBlocking(bool isNonBlocking);

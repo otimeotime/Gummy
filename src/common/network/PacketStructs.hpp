@@ -86,6 +86,15 @@ typedef struct {
 } ResMatchFind;
 
 typedef struct {
+    uint32_t userId;
+} ReqMatchCancel;
+
+typedef struct {
+    bool isSuccess;
+    char message[100];
+} ResMatchCancel;
+
+typedef struct {
     uint32_t matchId;
 } ReqMatchDecide1; // This is Request from server to client, not vice versa
 

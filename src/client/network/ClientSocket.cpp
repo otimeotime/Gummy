@@ -127,3 +127,39 @@ std::vector<PlayerStatusInfo> ClientSocket::GetUserList() {
     }
     return result;
 }
+
+bool ClientSocket::SendFindMatch() {
+    if (!mIsConnected) return false;
+    ReqMatchFind req;
+    req.userId = 0; 
+    
+    return PacketUtils::SendPacket(mSocket, PacketType::REQ_MATCH_FIND, req);
+    // Response RES_MATCH_FIND will be handled in CheckNotifications
+}
+
+bool ClientSocket::SendMatchDecision(bool accepted) {
+    if (!mIsConnected) return false;
+    ResMatchDecide1 res;
+    res.isSuccess = accepted;
+    return PacketUtils::SendPacket(mSocket, PacketType::RES_MATCH_DECIDE_1, res);
+}
+
+bool ClientSocket::CheckNotifications(Packet& outPacket) {
+    if (!mIsConnected) return false;
+    if (mSocket->HasData()) {
+        return PacketUtils::ReceivePacket(mSocket, outPacket);
+    }
+    return false;
+}
+
+bool ClientSocket::SendCancelMatch() {
+    if (!mIsConnected) return false;
+    ReqMatchCancel req;
+    req.userId = 0; 
+    
+    if (!PacketUtils::SendPacket(mSocket, PacketType::REQ_MATCH_CANCEL, req)) return false;
+    
+    // We can decide to wait for RES or just assume it's sent. 
+    // Usually UI update is immediate.
+    return true;
+}

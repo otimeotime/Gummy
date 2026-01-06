@@ -9,7 +9,13 @@ SceneDashboard::SceneDashboard(std::string username)
     : m_username(username), m_showPlayerMenu(false), 
       m_btnChallenge(nullptr), m_btnProfile(nullptr),
       m_lblChallenge(nullptr), m_lblProfile(nullptr),
-      m_lblWelcome(nullptr)
+      m_lblWelcome(nullptr),
+      m_isSearching(false), m_searchStartTime(0),
+      m_btnFindMatch(nullptr), m_lblFindMatch(nullptr),
+      m_btnCancelSearch(nullptr), m_lblSearchingTimer(nullptr),
+      m_showMatchPopup(false), m_hasMatchDecision(false), 
+      m_btnAccept(nullptr), m_btnDecline(nullptr), m_lblMatchFound(nullptr),
+      m_lblAccept(nullptr), m_lblDecline(nullptr), m_lblMatchStatus(nullptr)
 {
     // Implementation moved to onEnter to fetch real data
 }
@@ -66,17 +72,59 @@ bool SceneDashboard::onEnter() {
     // "FIND MATCH" Button
     int playBtnW = 250;
     int playBtnH = 80;
-    Button* btnFindMatch = new Button(centerX - (playBtnW / 2), centerY - 40, playBtnW, playBtnH, "btn_generic", []() {
-        std::cout << "[SceneDashboard] Finding Match..." << std::endl;
+    m_btnFindMatch = new Button(centerX - (playBtnW / 2), centerY - 40, playBtnW, playBtnH, "btn_generic", [this]() {
+        std::cout << "[SceneDashboard] Sending Find Match Request..." << std::endl;
+        if(Game::getInstance()->getClientSocket()->SendFindMatch()) {
+             std::cout << " > Request Sent. Waiting for server confirmation..." << std::endl;
+             // Do NOT start timer yet. Wait for RES_MATCH_FIND.
+        } else {
+             std::cout << " > Request Failed (Send Error)." << std::endl;
+        }
     }, 181, 73);
-    m_uiObjects.push_back(btnFindMatch);
+    // m_uiObjects.push_back(m_btnFindMatch); // Managed manually
 
-    Text* lblFindMatch = new Text(centerX - 80, centerY - 15, "assets/Arial.ttf", 28, "FIND MATCH", {0, 0, 0, 255});
-    m_uiObjects.push_back(lblFindMatch);
+    m_lblFindMatch = new Text(centerX - 80, centerY - 15, "assets/Arial.ttf", 28, "FIND MATCH", {0, 0, 0, 255});
+    // m_uiObjects.push_back(m_lblFindMatch); // Managed manually
 
-    // --- POPUP MENU BUTTONS (Hidden initially, managed manually) ---
-    // We create them but don't add to m_uiObjects to avoid auto-update/draw in the wrong order
-    // We will update/draw them manually when menu is open
+    // Cancel Search Button (Same position as Find Match)
+    m_btnCancelSearch = new Button(centerX - (playBtnW / 2), centerY + 60, playBtnW, 50, "btn_generic", [this]() {
+         std::cout << "[SceneDashboard] Cancelling Search..." << std::endl;
+         Game::getInstance()->getClientSocket()->SendCancelMatch();
+         m_isSearching = false;
+    }, 181, 73);
+
+    m_lblSearchingTimer = new Text(centerX - 100, centerY - 20, "assets/Arial.ttf", 24, "Searching... 00:00", {255, 255, 0, 255});
+
+    // --- POPUP MENU BUTTONS (Hidden initially) ---
+    // ... (Existing code) ...
+
+    // --- MATCHMAKING POPUP ---
+    m_lblMatchFound = new Text( centerX - 100, centerY - 80, "assets/Arial.ttf", 32, "MATCH FOUND!", {255, 0, 0, 255});
+    m_lblMatchStatus = new Text( centerX - 100, centerY, "assets/Arial.ttf", 20, "", {0, 255, 0, 255});
+
+    m_lblAccept = new Text(0, 0, "assets/Arial.ttf", 20, "Accept", {0,0,0,255});
+    m_lblDecline = new Text(0, 0, "assets/Arial.ttf", 20, "Decline", {0,0,0,255});
+    
+    m_btnAccept = new Button(centerX - 110, centerY, 100, 40, "btn_generic", [this]() {
+         std::cout << "Accepted Match!" << std::endl;
+         Game::getInstance()->getClientSocket()->SendMatchDecision(true);
+         m_hasMatchDecision = true;
+         m_lblMatchStatus->setText("Waiting for opponent...");
+         m_lblMatchStatus->setColor({255, 255, 0, 255});
+    }, 181, 73);
+    
+    m_btnDecline = new Button(centerX + 10, centerY, 100, 40, "btn_generic", [this]() {
+         std::cout << "Declined Match!" << std::endl;
+         Game::getInstance()->getClientSocket()->SendMatchDecision(false);
+         // m_showMatchPopup = false; // Maybe wait for server? Or just close?
+         // If declined, server cancels match for both.
+         m_hasMatchDecision = true;
+         m_lblMatchStatus->setText("You declined.");
+         m_lblMatchStatus->setColor({255, 0, 0, 255});
+         // Close after short delay? Or immediately?
+         m_showMatchPopup = false;
+    }, 181, 73);
+
     m_btnChallenge = new Button(0, 0, 140, 40, "btn_generic", [this]() {
         std::cout << "[SceneDashboard] Challenge sent to " << m_selectedPlayer << std::endl;
         m_showPlayerMenu = false;
@@ -145,6 +193,55 @@ void SceneDashboard::refreshPlayerList() {
 }
 
 void SceneDashboard::update() {
+    // Check Matchmaking Notifications
+    Packet packet;
+    if (Game::getInstance()->getClientSocket()->CheckNotifications(packet)) {
+        if (packet.header.type == PacketType::RES_MATCH_FIND) {
+             std::cout << "[Dashboard] Search Pending Confirmed by Server." << std::endl;
+             m_isSearching = true;
+             m_searchStartTime = SDL_GetTicks();
+        }
+        else if (packet.header.type == PacketType::REQ_MATCH_DECIDE_1) {
+            std::cout << "[Dashboard] Match Found! Displaying popup." << std::endl;
+            m_isSearching = false;
+            m_showMatchPopup = true;
+            m_hasMatchDecision = false;
+        }
+        else if (packet.header.type == PacketType::RES_MATCH_DECIDE_2) {
+             std::cout << "[Dashboard] Match Confirmed! Starting Game..." << std::endl;
+             // TODO: Transition to SceneGame
+             // ResMatchDecide2 has playerOrder info
+        }
+        else if (packet.header.type == PacketType::RES_MATCH_CANCEL) {
+             m_isSearching = false;
+             m_showMatchPopup = false; 
+             m_hasMatchDecision = false;
+             std::cout << "[Dashboard] Match cancelled (Opponent declined or You cancelled)." << std::endl;
+        }
+    }
+
+    if (m_showMatchPopup) {
+         if (!m_hasMatchDecision) {
+            m_btnAccept->update();
+            m_btnDecline->update();
+         }
+         // Block other updates
+         return;
+    }
+    
+    if (m_isSearching) {
+        uint32_t elapsed = (SDL_GetTicks() - m_searchStartTime) / 1000;
+        int min = elapsed / 60;
+        int sec = elapsed % 60;
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "Searching... %02d:%02d", min, sec);
+        m_lblSearchingTimer->setText(buf);
+        
+        m_btnCancelSearch->update();
+    } else {
+        m_btnFindMatch->update();
+    }
+
     // 1. Auto Refresh every 1 second
     if (SDL_GetTicks() - m_lastRefreshTime > 1000) {
         refreshPlayerList();
@@ -276,6 +373,34 @@ void SceneDashboard::drawPlayerMenu() {
     m_lblProfile->draw();
 }
 
+void SceneDashboard::drawMatchPopup() {
+     if (!m_showMatchPopup) return;
+     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+     int w, h;
+     SDL_GetRendererOutputSize(renderer, &w, &h);
+     TextureManager::getInstance()->drawFillRect(0, 0, w, h, 0, 0, 0, 200, renderer);
+     
+     m_lblMatchFound->draw();
+     
+     if (!m_hasMatchDecision) {
+        m_btnAccept->draw();
+        m_btnDecline->draw();
+
+        // Update label positions
+        int acceptX = (int)m_btnAccept->getPosition().x + 20;
+        int acceptY = (int)m_btnAccept->getPosition().y + 10;
+        m_lblAccept->setPosition(acceptX, acceptY);
+        m_lblAccept->draw();
+
+        int declineX = (int)m_btnDecline->getPosition().x + 15;
+        int declineY = (int)m_btnDecline->getPosition().y + 10;
+        m_lblDecline->setPosition(declineX, declineY);
+        m_lblDecline->draw();
+     } else {
+        m_lblMatchStatus->draw();
+     }
+}
+
 void SceneDashboard::drawSidebar() {
     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
     int screenW = 1280;
@@ -303,9 +428,27 @@ void SceneDashboard::render() {
     for (auto obj : m_uiObjects) {
         obj->draw();
     }
+    
+    // Draw Search UI
+    if (m_isSearching) {
+         m_lblSearchingTimer->draw();
+         m_btnCancelSearch->draw();
+         
+         // Should add a "Cancel" text label on top of button if button texture is generic
+         // For now, assume button texture has cancel? Or add label.
+         // Let's add a quick text label for Cancel
+         Text lblCancel(m_btnCancelSearch->getPosition().x + 90, m_btnCancelSearch->getPosition().y + 15, "assets/Arial.ttf", 20, "CANCEL", {255,0,0,255});
+         lblCancel.draw();
+    } else {
+         m_btnFindMatch->draw();
+         m_lblFindMatch->draw();
+    }
 
     // 3. Sidebar (which calls drawPlayerMenu)
     drawSidebar();
+    
+    // 4. Match Popup
+    drawMatchPopup();
 }
 
 bool SceneDashboard::onExit() {
@@ -326,6 +469,20 @@ bool SceneDashboard::onExit() {
     if (m_btnProfile) { m_btnProfile->clean(); delete m_btnProfile; }
     if (m_lblChallenge) { m_lblChallenge->clean(); delete m_lblChallenge; }
     if (m_lblProfile) { m_lblProfile->clean(); delete m_lblProfile; }
+    
+    // Match Popup cleanup
+    if (m_lblMatchFound) { m_lblMatchFound->clean(); delete m_lblMatchFound; }
+    if (m_lblMatchStatus) { m_lblMatchStatus->clean(); delete m_lblMatchStatus; }
+    if (m_btnAccept) { m_btnAccept->clean(); delete m_btnAccept; }
+    if (m_btnDecline) { m_btnDecline->clean(); delete m_btnDecline; }
+    if (m_lblAccept) { m_lblAccept->clean(); delete m_lblAccept; }
+    if (m_lblDecline) { m_lblDecline->clean(); delete m_lblDecline; }
+
+    // Search UI cleanup
+    if (m_btnFindMatch) { m_btnFindMatch->clean(); delete m_btnFindMatch; }
+    if (m_lblFindMatch) { m_lblFindMatch->clean(); delete m_lblFindMatch; }
+    if (m_btnCancelSearch) { m_btnCancelSearch->clean(); delete m_btnCancelSearch; }
+    if (m_lblSearchingTimer) { m_lblSearchingTimer->clean(); delete m_lblSearchingTimer; }
     
     return true;
 }

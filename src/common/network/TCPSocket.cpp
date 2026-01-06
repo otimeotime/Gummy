@@ -77,8 +77,10 @@ bool TCPSocket::Send(const void* data, size_t size) {
     size_t totalSent = 0;
     const char* dataPtr = static_cast<const char*>(data);
     while (totalSent < size) {
-        ssize_t sent = send(mSockFd, dataPtr + totalSent, size - totalSent, 0);
+        // Use MSG_NOSIGNAL to prevent SIGPIPE on Linux if the socket is closed by peer
+        ssize_t sent = send(mSockFd, dataPtr + totalSent, size - totalSent, MSG_NOSIGNAL);
         if (sent < 0) {
+            std::cerr << "[TCPSocket] Send error: " << strerror(errno) << std::endl;
             return false;
         }
         totalSent += sent;
@@ -105,4 +107,14 @@ void TCPSocket::SetNonBlocking(bool isNonBlocking) {
     } else {
         fcntl(mSockFd, F_SETFL, flags & ~O_NONBLOCK);
     }
+}
+
+bool TCPSocket::HasData() {
+    if (mSockFd < 0) return false;
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(mSockFd, &readfds);
+    struct timeval tv = {0, 0}; // Zero timeout (poll)
+    int result = select(mSockFd + 1, &readfds, NULL, NULL, &tv);
+    return result > 0;
 }
