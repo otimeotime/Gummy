@@ -143,6 +143,24 @@ void GameServer::HandleClient(TCPSocket* clientSocket) {
                 {
                     std::lock_guard<std::mutex> lock(m_roomMutex);
 
+                    // Simple restart support: if the previous match ended, reset server-side state
+                    // so new clients can join again.
+                    if (m_gameRoom && m_gameRoom->getState() == GAME_OVER) {
+                        delete m_gameRoom;
+                        m_gameRoom = nullptr;
+
+                        for (auto* p : m_players) {
+                            delete p;
+                        }
+                        m_players.clear();
+
+                        delete m_mapLoader;
+                        m_mapLoader = nullptr;
+
+                        m_matchId++;
+                        m_tick = 0;
+                    }
+
                     if (!m_mapLoader) {
                         m_mapLoader = new MapLoader();
                         std::string mapPath = (req.mapName[0] != '\0') ? std::string(req.mapName) : std::string(kDefaultMap);
@@ -256,6 +274,7 @@ void GameServer::BroadcastStateSnapshot() {
         if (!m_gameRoom) {
             snapshot.roomState = (uint32_t)WAITING_FOR_PLAYERS;
             snapshot.turnTimer = 0.0f;
+            snapshot.wind = 0.0f;
             snapshot.terrainModified = 0;
             snapshot.hasExplosion = 0;
             snapshot.explosionX = 0.0f;
@@ -282,6 +301,7 @@ void GameServer::BroadcastStateSnapshot() {
         } else {
             snapshot.roomState = (uint32_t)m_gameRoom->getState();
             snapshot.turnTimer = m_gameRoom->getTurnTimer();
+            snapshot.wind = m_gameRoom->getWind();
             snapshot.terrainModified = m_gameRoom->consumeTerrainModified() ? 1 : 0;
 
             float ex = 0.0f, ey = 0.0f, er = 0.0f;

@@ -1,42 +1,71 @@
 #pragma once
+
 #include "../core/GameState.hpp"
 #include "../core/Game.hpp"
 #include "../core/TextureManager.hpp"
 #include "../core/InputHandler.hpp"
+
+#include "../../common/network/TCPSocket.hpp"
+#include "../../common/network/PacketUtils.hpp"
+#include "../../common/network/PacketStructs.hpp"
+
 #include "../../ingame_server/logic/MapLoader.hpp"
-#include "../../ingame_server/logic/Player.hpp"
-#include "../../ingame_server/logic/GameRoom.hpp"
+
+#include <atomic>
+#include <mutex>
 #include <string>
-#include <SDL2/SDL.h>
+#include <thread>
+
 #include <SDL2/SDL_ttf.h>
 
 class SceneGame : public GameState {
 public:
-    SceneGame(std::string mapToLoad = "assets/maps/flatmap.txt");
-    virtual bool onEnter() override;
-    virtual bool onExit() override;
-    virtual void update() override;
-    virtual void render() override;
+    SceneGame(std::string serverIp = "127.0.0.1", int serverPort = 9090, std::string mapPath = "assets/maps/flatmap.txt");
 
-    virtual std::string getStateID() const override { return "SCENE_GAME"; }
+    bool onEnter() override;
+    bool onExit() override;
+    void update() override;
+    void render() override;
+
+    std::string getStateID() const override { return "SCENE_GAME"; }
 
 private:
-    std::string m_mapToLoad;
+    void ReceiverLoop();
+    void SendInput(uint32_t command, float value = 0.0f);
+
+    void renderHealthBar(const NetPlayerState& player);
+
+    void createMapTexture();
+    void updateMapTexture();
+
+    std::string m_serverIp;
+    int m_serverPort;
+
+    std::atomic<bool> m_running;
+    std::thread m_receiverThread;
+
+    TCPSocket* m_socket;
+
+    uint32_t m_matchId;
+    uint32_t m_playerId;
+    uint32_t m_seq;
+
+    std::mutex m_stateMutex;
+    ResIngameState m_lastState;
+    bool m_hasState;
+
     std::string m_bgTextureID;
     std::string m_playerID;
     std::string m_bulletID;
-    int m_playerX;
-    int m_playerY;
-    bool m_startOrient;
-    bool m_mapModified;
-    void createMapTexture();
-    void updateMapTexture();
-    void renderHealthBar(Position playerPos, Player* player);
-    GameRoom* m_gameRoom;
+
+    std::string m_mapPath;
     MapLoader* m_mapLoader;
     SDL_Texture* m_mapTexture;
-    Player* m_player;
-    std::vector<Player*> m_players;
+    bool m_mapModified;
+
     TTF_Font* m_font;
+
     Uint32 m_lastTick;
+
+    bool m_terminalQueued = false;
 };

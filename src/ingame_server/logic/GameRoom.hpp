@@ -5,8 +5,9 @@
 #include <vector>
 #include <iostream>
 #include <string>
+#include <cstdlib>
 
-#define TIMER 10.0f
+#define TIMER 30.0f
 
 enum RoomState {
     WAITING_FOR_PLAYERS,
@@ -40,7 +41,9 @@ private:
         m_pendingShooter = nullptr;
         m_waitingForShot = false;
 
-        m_physics->setWind(0);
+        // Wind for physics: keep it small ([-0.3 .. 0.3]). Client can scale for display.
+        float new_wind = ((std::rand() % 601) - 300) / 1000.0f;
+        m_physics->setWind(new_wind);
     }
 
     bool hasActiveProjectile(const std::vector<Projectile>& projectiles) const {
@@ -122,6 +125,10 @@ public:
 
     float getTurnTimer() const { return m_turnTimer; }
 
+    float getWind() const {
+        return m_physics ? m_physics->getWind() : 0.0f;
+    }
+
     RoomState getState() const { return m_state; }
 
     Player* getCurrentPlayer() const {
@@ -161,7 +168,16 @@ public:
         if (m_state == PLAYING_TURN) {
             m_turnTimer -= deltaTime;
             if (m_turnTimer <= 0.0f) {
-                commitShot();
+                Player* currentPlayer = getCurrentPlayer();
+                if (!currentPlayer || !currentPlayer->isAlive()) {
+                    switchTurn();
+                } else if (currentPlayer->m_power < 1.0f) {
+                    // If time ran out and power is 0, don't fire anything.
+                    currentPlayer->m_power = 0.0f;
+                    switchTurn();
+                } else {
+                    commitShot();
+                }
             }
             return;
         }
@@ -191,7 +207,16 @@ public:
         if (m_state == PLAYING_TURN) {
             m_turnTimer -= deltaTime;
             if (m_turnTimer <= 0.0f) {
-                commitShot();
+                Player* currentPlayer = getCurrentPlayer();
+                if (!currentPlayer || !currentPlayer->isAlive()) {
+                    switchTurn();
+                } else if (currentPlayer->m_power < 1.0f) {
+                    // If time ran out and power is 0, don't fire anything.
+                    currentPlayer->m_power = 0.0f;
+                    switchTurn();
+                } else {
+                    commitShot();
+                }
             }
             return;
         }
@@ -228,7 +253,12 @@ public:
             if (currentPlayer->m_power < 0.0f) currentPlayer->m_power = 0.0f;
             if (currentPlayer->m_power > 100.0f) currentPlayer->m_power = 100.0f;
         } else if (command == "FIRE") {
-            commitShot();
+            if (currentPlayer->m_power < 1.0f) {
+                // No-power fire: ignore (don't shoot and don't end turn).
+                currentPlayer->m_power = 0.0f;
+            } else {
+                commitShot();
+            }
         }
     }
 };
