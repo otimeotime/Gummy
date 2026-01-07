@@ -73,6 +73,7 @@ SERVICE_CLIENT_SRCS := \
 	src/client/scenes/SceneLogin.cpp \
 	src/client/scenes/SceneRegister.cpp \
 	src/client/scenes/SceneDashboard.cpp \
+	src/client/scenes/SceneViewProfile.cpp \
 	src/client/scenes/SceneGame.cpp \
 	src/client/scenes/TerminalScene.cpp \
 	src/client/ui/Button.cpp \

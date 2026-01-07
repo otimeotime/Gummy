@@ -111,26 +111,26 @@ bool SceneLogin::onEnter() {
     // ---------------------------------------------------------
 
     // A. Title Text: "LOGIN"
-    Text* lblTitle = new Text(centerX - 60, startY, "assets/Arial.ttf", 40, "LOGIN", {0, 0, 0, 255});
+    Text* lblTitle = new Text(centerX - 60, startY, "assets/font.ttf", 40, "LOGIN", {0, 0, 0, 255});
     m_uiObjects.push_back(lblTitle);
 
     // B. Username Input
-    Text* lblUserHint = new Text(inputX, startY + gapY - 25, "assets/Arial.ttf", 18, "Username:", {100, 100, 100, 255});
+    Text* lblUserHint = new Text(inputX, startY + gapY - 25, "assets/font.ttf", 18, "Username:", {100, 100, 100, 255});
     m_uiObjects.push_back(lblUserHint);
 
-    m_inputUsername = new TextInput(inputX, startY + gapY, inputW, inputH, "assets/Arial.ttf", 20);
+    m_inputUsername = new TextInput(inputX, startY + gapY, inputW, inputH, "assets/font.ttf", 20);
     m_uiObjects.push_back(m_inputUsername);
 
     // C. Password Input
-    Text* lblPassHint = new Text(inputX, startY + (gapY * 2) - 25, "assets/Arial.ttf", 18, "Password:", {100, 100, 100, 255});
+    Text* lblPassHint = new Text(inputX, startY + (gapY * 2) - 25, "assets/font.ttf", 18, "Password:", {100, 100, 100, 255});
     m_uiObjects.push_back(lblPassHint);
 
-    m_inputPassword = new TextInput(inputX, startY + (gapY * 2), inputW, inputH, "assets/Arial.ttf", 20);
+    m_inputPassword = new TextInput(inputX, startY + (gapY * 2), inputW, inputH, "assets/font.ttf", 20);
     m_uiObjects.push_back(m_inputPassword);
 
     // Error/Status Label (Below Password, Above Login Button)
     int errorY = startY + (gapY * 2) + inputH + 10;
-    m_lblError = new Text(centerX - 150, errorY, "assets/Arial.ttf", 16, "", {255, 0, 0, 255});
+    m_lblError = new Text(centerX - 150, errorY, "assets/font.ttf", 16, "", {255, 0, 0, 255});
     if (!m_initMessage.empty()) {
         m_lblError->setText(m_initMessage);
         m_lblError->setColor({0, 128, 0, 255}); // Green for success
@@ -168,18 +168,19 @@ bool SceneLogin::onEnter() {
             m_lblError->setColor({255, 0, 0, 255});
         }
 
-    }, srcBtnW, srcBtnH);
+    }, srcBtnW, srcBtnH, SDL_Color{0, 0, 0, 255});
     m_uiObjects.push_back(btnLogin);
 
     // Login Text Label (Centered on button)
-    Text* lblLoginBtn = new Text(btnX + 35, btnY + 12, "assets/Arial.ttf", 18, "Login", {0, 0, 0, 255});
+    Text* lblLoginBtn = new Text(btnX + 35, btnY + 12, "assets/font.ttf", 18, "Login", {0, 0, 0, 255});
+    btnLogin->centerObject(lblLoginBtn);
     m_uiObjects.push_back(lblLoginBtn);
 
     // E. Register Link (Below Login Button)
     int regLinkX = centerX - 35; 
     int regLinkY = btnY + btnHeight + 20;
 
-    RegisterLink* lnkRegister = new RegisterLink(regLinkX, regLinkY, "assets/Arial.ttf", 18, "Register", []() {
+    RegisterLink* lnkRegister = new RegisterLink(regLinkX, regLinkY, "assets/font.ttf", 18, "Register", []() {
         std::cout << "[SceneLogin] Switch to Register Scene" << std::endl;
         Game::getInstance()->getStateMachine()->changeState(new SceneRegister());
     });

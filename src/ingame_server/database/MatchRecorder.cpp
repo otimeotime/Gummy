@@ -2,6 +2,8 @@
 
 #include <pqxx/pqxx>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 
@@ -10,6 +12,69 @@ std::string EnvOr(const char* key, const std::string& def) {
     const char* v = std::getenv(key);
     if (!v || !*v) return def;
     return std::string(v);
+}
+
+struct EloUpdate {
+    long long userId = 0;
+    int oldElo = 0;
+    int newElo = 0;
+    int delta = 0;
+};
+
+double ClampDeltaForDivision(double delta) {
+    // The spec mentions `min(min(10,delta),1)` which would allow division by 0 when delta=0.
+    // We interpret the intent as clamping delta to [1, 10] for the denominator.
+    const double clamped = std::min(10.0, std::max(0.0, delta));
+    return std::max(1.0, clamped);
+}
+
+double ClampDeltaForBonus(double delta) {
+    return std::min(10.0, std::max(0.0, delta));
+}
+
+std::pair<EloUpdate, EloUpdate> ComputeEloDeltas(bool isDraw,
+                                                 long long userAId,
+                                                 int eloA,
+                                                 long long userBId,
+                                                 int eloB,
+                                                 long long winnerUserId) {
+    const double delta = std::fabs((double)eloA - (double)eloB);
+    const double denom = ClampDeltaForDivision(delta);
+    const double deltaBonus = ClampDeltaForBonus(delta);
+
+    EloUpdate a{userAId, eloA, eloA, 0};
+    EloUpdate b{userBId, eloB, eloB, 0};
+
+    if (!isDraw) {
+        const double change = 50.0 / denom;
+        const int rounded = (int)std::lround(change);
+        if (winnerUserId == userAId) {
+            a.delta = +rounded;
+            b.delta = -rounded;
+        } else {
+            a.delta = -rounded;
+            b.delta = +rounded;
+        }
+    } else {
+        // Higher-elo loses: 10/denom + min(10, delta). Lower-elo gains same.
+        const double change = 10.0 / denom + deltaBonus;
+        const int rounded = (int)std::lround(change);
+        if (eloA == eloB) {
+            // Tie: treat as zero-sum but no clear higher/lower; simplest is no change.
+            a.delta = 0;
+            b.delta = 0;
+        } else if (eloA > eloB) {
+            a.delta = -rounded;
+            b.delta = +rounded;
+        } else {
+            a.delta = +rounded;
+            b.delta = -rounded;
+        }
+    }
+
+    a.newElo = std::max(0, a.oldElo + a.delta);
+    b.newElo = std::max(0, b.oldElo + b.delta);
+    return {a, b};
 }
 }
 
@@ -36,6 +101,17 @@ bool MatchRecorder::SaveMatch(uint32_t matchId,
     try {
         pqxx::connection conn(BuildConnString());
         pqxx::work W(conn);
+
+        // Idempotency: if this match row was already finalized (ended_at set), do not apply ELO again.
+        bool alreadyFinalized = false;
+        {
+            const auto existing = W.exec_params(
+                "SELECT ended_at IS NOT NULL AS finalized FROM \"Match\" WHERE match_id = $1",
+                (long long)matchId);
+            if (!existing.empty()) {
+                alreadyFinalized = existing[0][0].as<bool>(false);
+            }
+        }
 
         // Upsert match row. Keep started_at stable if already present.
         // Constraints:
@@ -87,6 +163,56 @@ bool MatchRecorder::SaveMatch(uint32_t matchId,
                 p.team,
                 p.turnOrder,
                 p.score);
+        }
+
+        // Apply ELO changes (2-player matches) exactly once per finalized match.
+        if (!alreadyFinalized) {
+            long long p0 = 0;
+            long long p1 = 0;
+            for (const auto& p : participants) {
+                if (!p.isPlayer) continue;
+                if (p.userId == 0) continue;
+                if (p0 == 0) {
+                    p0 = (long long)p.userId;
+                } else if (p1 == 0 && (long long)p.userId != p0) {
+                    p1 = (long long)p.userId;
+                }
+            }
+
+            if (p0 != 0 && p1 != 0) {
+                // Lock both user rows so concurrent matches can't interleave updates.
+                const auto rows = W.exec_params(
+                    "SELECT user_id, elo FROM \"User\" WHERE user_id IN ($1, $2) FOR UPDATE",
+                    p0,
+                    p1);
+
+                int elo0 = 300;
+                int elo1 = 300;
+                for (const auto& r : rows) {
+                    const long long uid = r[0].as<long long>();
+                    const int elo = r[1].as<int>(300);
+                    if (uid == p0) elo0 = elo;
+                    if (uid == p1) elo1 = elo;
+                }
+
+                const auto updates = ComputeEloDeltas(
+                    isDraw,
+                    p0,
+                    elo0,
+                    p1,
+                    elo1,
+                    (long long)winnerUserId);
+
+                // For non-draw matches, ensure the provided winner is one of the participants.
+                if (!isDraw) {
+                    if ((long long)winnerUserId != p0 && (long long)winnerUserId != p1) {
+                        throw std::runtime_error("SaveMatch: winnerUserId not among participants");
+                    }
+                }
+
+                W.exec_params("UPDATE \"User\" SET elo = $1 WHERE user_id = $2", updates.first.newElo, updates.first.userId);
+                W.exec_params("UPDATE \"User\" SET elo = $1 WHERE user_id = $2", updates.second.newElo, updates.second.userId);
+            }
         }
 
         // Keep the BIGSERIAL sequence from falling behind when we insert explicit match_id values.

@@ -11,7 +11,18 @@ public:
     // Constructor
     // width, height: Destination size (on screen)
     // srcWidth, srcHeight: Source size (in sprite sheet). Defaults to 0 (same as dest)
-    Button(float x, float y, int width, int height, std::string textureID, Callback callback, int srcWidth = 0, int srcHeight = 0);
+    Button(
+        float x,
+        float y,
+        int width,
+        int height,
+        std::string textureID,
+        Callback callback,
+        int srcWidth = 0,
+        int srcHeight = 0,
+        SDL_Color strokeColor = SDL_Color{255, 255, 255, 255},
+        int strokeThickness = 3
+    );
 
     // Override methods from UIObject
     virtual void load() override;
@@ -24,6 +35,14 @@ public:
 
     void setAlpha(Uint8 alpha) { m_alpha = alpha; }
     Uint8 getAlpha() const { return m_alpha; }
+
+    void setStrokeColor(SDL_Color color) { m_strokeColor = color; }
+    SDL_Color getStrokeColor() const { return m_strokeColor; }
+
+    void setStrokeThickness(int thickness) { m_strokeThickness = thickness; }
+    int getStrokeThickness() const { return m_strokeThickness; }
+
+    void centerObject(UIObject* obj, float offsetX = 0.0f, float offsetY = 0.0f) const;
 
 private:
     // Button visual states
@@ -44,4 +63,7 @@ private:
 
     bool m_enabled = true;
     Uint8 m_alpha = 255;
+
+    SDL_Color m_strokeColor{255, 255, 255, 255};
+    int m_strokeThickness = 3;
 };

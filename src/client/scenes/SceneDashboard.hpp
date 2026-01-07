@@ -8,6 +8,8 @@
 #include <string>
 #include "../network/ClientSocket.hpp" // For PlayerStatusInfo and PacketStructs if needed. Accessing PacketStructs via ClientSocket usually, but needed for PlayerStatusInfo type.
 
+class SceneViewProfile;
+
 class SceneDashboard : public GameState {
 public:
     SceneDashboard(std::string username);
@@ -24,8 +26,8 @@ private:
     std::vector<UIObject*> m_uiObjects;
     std::string m_bgTextureID;
 
-    // Specific UI pointers for updates
-    Text* m_lblWelcome;
+    // Header
+    Text* m_lblTitle = nullptr;
 
     // Searching State interaction (Searching...)
     bool m_isSearching;
@@ -35,21 +37,25 @@ private:
     Button* m_btnFindMatch; 
     Text* m_lblFindMatch;
 
+    // Replay button + popup dialog
+    Button* m_btnViewProfile = nullptr;
+    Text* m_lblViewProfile = nullptr;
+
+    Button* m_btnReplay = nullptr;
+    Text* m_lblReplay = nullptr;
+    bool m_showReplayPopup = false;
+    Text* m_lblReplayPopupTitle = nullptr;
+    Text* m_lblReplayPopupHint = nullptr;
+    TextInput* m_inReplayDir = nullptr;
+    Button* m_btnReplayStart = nullptr;
+    Text* m_lblReplayStart = nullptr;
+    Button* m_btnReplayCancel = nullptr;
+    Text* m_lblReplayCancel = nullptr;
+
     // Players List
     std::vector<PlayerStatusInfo> m_allPlayers;
     std::vector<Text*> m_playerListTexts; // Separate list for dynamic UI
     uint32_t m_lastRefreshTime;
-    
-    // Player Menu Popup State
-    bool m_showPlayerMenu;
-    std::string m_selectedPlayer;
-    Vector2D m_menuPosition;
-    
-    // UI Elements for the popup menu (created dynamically or hidden)
-    Button* m_btnChallenge;
-    Button* m_btnProfile;
-    Text* m_lblChallenge;
-    Text* m_lblProfile;
 
     // Matchmaking Popup
     bool m_showMatchPopup;
@@ -62,18 +68,8 @@ private:
     Text* m_lblDecline;
     Text* m_lblMatchStatus; // "Waiting for opponent..."
 
-    // Replay watch UI (launch a replay-mode ingame server session viewer)
-    Text* m_lblReplayTitle = nullptr;
-    Text* m_lblReplayFile = nullptr;
-    TextInput* m_inReplayFile = nullptr;
-    Button* m_btnWatchReplay = nullptr;
-    Text* m_lblWatchReplay = nullptr;
-
     void drawSidebar();
-    void drawPlayerMenu();
     void drawMatchPopup();
-    void updateSearchingUI(); // New helper
-    void handlePlayerListClick();
-    bool isMouseInsideMenu(Vector2D* mousePos);
+    void drawReplayPopup();
     void refreshPlayerList(); // New helper
 };

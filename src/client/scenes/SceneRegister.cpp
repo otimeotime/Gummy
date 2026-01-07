@@ -83,32 +83,32 @@ bool SceneRegister::onEnter() {
     // 3. UI Elements
 
     // Title
-    Text* lblTitle = new Text(centerX - 90, startY, "assets/Arial.ttf", 40, "REGISTER", {0, 0, 0, 255});
+    Text* lblTitle = new Text(centerX - 90, startY, "assets/font.ttf", 40, "REGISTER", {0, 0, 0, 255});
     m_uiObjects.push_back(lblTitle);
 
     // Username
-    Text* lblUserHint = new Text(inputX, startY + gapY - 25, "assets/Arial.ttf", 18, "Username:", {100, 100, 100, 255});
+    Text* lblUserHint = new Text(inputX, startY + gapY - 25, "assets/font.ttf", 18, "Username:", {100, 100, 100, 255});
     m_uiObjects.push_back(lblUserHint);
 
-    m_inputUsername = new TextInput(inputX, startY + gapY, inputW, inputH, "assets/Arial.ttf", 20);
+    m_inputUsername = new TextInput(inputX, startY + gapY, inputW, inputH, "assets/font.ttf", 20);
     m_uiObjects.push_back(m_inputUsername);
 
     // Password
-    Text* lblPassHint = new Text(inputX, startY + (gapY * 2) - 25, "assets/Arial.ttf", 18, "Password:", {100, 100, 100, 255});
+    Text* lblPassHint = new Text(inputX, startY + (gapY * 2) - 25, "assets/font.ttf", 18, "Password:", {100, 100, 100, 255});
     m_uiObjects.push_back(lblPassHint);
 
-    m_inputPassword = new TextInput(inputX, startY + (gapY * 2), inputW, inputH, "assets/Arial.ttf", 20);
+    m_inputPassword = new TextInput(inputX, startY + (gapY * 2), inputW, inputH, "assets/font.ttf", 20);
     m_uiObjects.push_back(m_inputPassword);
 
     // Confirm Password
-    Text* lblConfirmHint = new Text(inputX, startY + (gapY * 3) - 25, "assets/Arial.ttf", 18, "Confirm Password:", {100, 100, 100, 255});
+    Text* lblConfirmHint = new Text(inputX, startY + (gapY * 3) - 25, "assets/font.ttf", 18, "Confirm Password:", {100, 100, 100, 255});
     m_uiObjects.push_back(lblConfirmHint);
 
-    m_inputConfirmPassword = new TextInput(inputX, startY + (gapY * 3), inputW, inputH, "assets/Arial.ttf", 20);
+    m_inputConfirmPassword = new TextInput(inputX, startY + (gapY * 3), inputW, inputH, "assets/font.ttf", 20);
     m_uiObjects.push_back(m_inputConfirmPassword);
 
     // Error Label
-    m_lblError = new Text(inputX, startY + (gapY * 3) + inputH + 5, "assets/Arial.ttf", 14, "", {255, 0, 0, 255});
+    m_lblError = new Text(inputX, startY + (gapY * 3) + inputH + 5, "assets/font.ttf", 14, "", {255, 0, 0, 255});
     m_uiObjects.push_back(m_lblError);
 
     // Register Button
@@ -153,14 +153,15 @@ bool SceneRegister::onEnter() {
     m_uiObjects.push_back(btnRegister);
 
     // Register Text on Button
-    Text* lblRegBtn = new Text(btnX + 25, btnY + 12, "assets/Arial.ttf", 18, "Register", {0, 0, 0, 255});
+    Text* lblRegBtn = new Text(btnX + 25, btnY + 12, "assets/font.ttf", 18, "Register", {255, 255, 255, 255});
+    btnRegister->centerObject(lblRegBtn);
     m_uiObjects.push_back(lblRegBtn);
 
     // Back to Login Link
     int linkX = centerX - 50;
     int linkY = btnY + btnHeight + 20;
     
-    TextLink* lnkLogin = new TextLink(linkX, linkY, "assets/Arial.ttf", 18, "Back to Login", []() {
+    TextLink* lnkLogin = new TextLink(linkX, linkY, "assets/font.ttf", 18, "Back to Login", []() {
         Game::getInstance()->getStateMachine()->changeState(new SceneLogin());
     });
     m_uiObjects.push_back(lnkLogin);

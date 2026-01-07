@@ -163,7 +163,7 @@ void SceneGame::EnsurePauseUI() {
         }
     }, 181, 73);
 
-    m_lblPause = new Text((float)x + 48, (float)y + 12, "assets/Arial.ttf", 18, "Pause", {0, 0, 0, 255});
+    m_lblPause = new Text((float)x + 48, (float)y + 12, "assets/font.ttf", 18, "Pause", {255, 255, 255, 255});
     // Use in-repo font for the pause overlay (falls back if missing).
     m_lblPauseStatus = new Text(20, 20, "assets/font.ttf", 22, "", {255, 255, 255, 255});
     m_lblPauseCountdown = new Text(640, 300, "assets/font.ttf", 96, "", {255, 255, 255, 255});
@@ -209,19 +209,19 @@ void SceneGame::EnsureDrawUI() {
         }
         SendDrawRequest();
     }, 181, 73);
-    m_lblDraw = new Text(0, 0, "assets/Arial.ttf", 18, "Draw", {0, 0, 0, 255});
+    m_lblDraw = new Text(0, 0, "assets/font.ttf", 18, "Draw", {255, 255, 255, 255});
 
     // Accept / Decline buttons (only shown for the non-requester)
     const int smallW = (btnW - gap) / 2;
     m_btnDrawAccept = new Button((float)drawX, (float)y, smallW, btnH, "btn_generic", [this]() {
         SendDrawDecision(true);
     }, 181, 73);
-    m_lblDrawAccept = new Text(0, 0, "assets/Arial.ttf", 18, "Accept", {0, 0, 0, 255});
+    m_lblDrawAccept = new Text(0, 0, "assets/font.ttf", 18, "Accept", {255, 255, 255, 255});
 
     m_btnDrawDecline = new Button((float)(drawX + smallW + gap), (float)y, smallW, btnH, "btn_generic", [this]() {
         SendDrawDecision(false);
     }, 181, 73);
-    m_lblDrawDecline = new Text(0, 0, "assets/Arial.ttf", 18, "Decline", {0, 0, 0, 255});
+    m_lblDrawDecline = new Text(0, 0, "assets/font.ttf", 18, "Decline", {255, 255, 255, 255});
 
     // Use in-repo font for notification/status text.
     m_lblDrawStatus = new Text(0, 0, "assets/font.ttf", 22, "", {255, 255, 255, 255});
@@ -246,7 +246,7 @@ void SceneGame::EnsureSurrenderUI() {
         std::lock_guard<std::mutex> lock(m_surrenderMutex);
         m_surrenderConfirmActive = true;
     }, 181, 73);
-    m_lblSurrender = new Text(0, 0, "assets/Arial.ttf", 18, "Surrender", {0, 0, 0, 255});
+    m_lblSurrender = new Text(0, 0, "assets/font.ttf", 18, "Surrender", {255, 255, 255, 255});
 
     // Confirmation overlay
     m_lblSurrenderConfirm = new Text(0, 0, "assets/font.ttf", 44, "Are you sure?", {255, 255, 255, 255});
@@ -260,13 +260,13 @@ void SceneGame::EnsureSurrenderUI() {
         }
         SendSurrenderRequest();
     }, 181, 73);
-    m_lblSurrenderYes = new Text(0, 0, "assets/Arial.ttf", 18, "Yes", {0, 0, 0, 255});
+    m_lblSurrenderYes = new Text(0, 0, "assets/font.ttf", 18, "Yes", {255, 255, 255, 255});
 
     m_btnSurrenderNo = new Button(0, 0, smallW, btnH, "btn_generic", [this]() {
         std::lock_guard<std::mutex> lock(m_surrenderMutex);
         m_surrenderConfirmActive = false;
     }, 181, 73);
-    m_lblSurrenderNo = new Text(0, 0, "assets/Arial.ttf", 18, "No", {0, 0, 0, 255});
+    m_lblSurrenderNo = new Text(0, 0, "assets/font.ttf", 18, "No", {255, 255, 255, 255});
 
     // Top-right toast/status
     m_lblSurrenderStatus = new Text(0, 0, "assets/font.ttf", 22, "", {255, 255, 255, 255});
@@ -324,7 +324,8 @@ void SceneGame::EnsureReplayUI() {
         // keep speed unchanged; server returns status in response
         (void)speed;
     }, 181, 73);
-    m_lblReplayPlayPause = new Text(x0 + 25, y0 + 10, "assets/Arial.ttf", 18, "Play/Pause", {0, 0, 0, 255});
+    m_lblReplayPlayPause = new Text(0, 0, "assets/font.ttf", 18, "Play/Pause", {255, 255, 255, 255});
+    m_btnReplayPlayPause->centerObject(m_lblReplayPlayPause);
 
     m_btnReplaySpeedDown = new Button(x0 + 150, y0, 60, 40, "btn_generic", [this]() {
         float speed = 1.0f;
@@ -336,7 +337,8 @@ void SceneGame::EnsureReplayUI() {
         if (speed < 0.25f) speed = 0.25f;
         SendReplayControl((uint32_t)REPLAY_CMD_SET_SPEED, 0, speed);
     }, 181, 73);
-    m_lblReplaySpeedDown = new Text(x0 + 170, y0 + 10, "assets/Arial.ttf", 18, "-", {0, 0, 0, 255});
+    m_lblReplaySpeedDown = new Text(0, 0, "assets/font.ttf", 18, "-", {255, 255, 255, 255});
+    m_btnReplaySpeedDown->centerObject(m_lblReplaySpeedDown);
 
     m_btnReplaySpeedUp = new Button(x0 + 220, y0, 60, 40, "btn_generic", [this]() {
         float speed = 1.0f;
@@ -348,9 +350,10 @@ void SceneGame::EnsureReplayUI() {
         if (speed > 16.0f) speed = 16.0f;
         SendReplayControl((uint32_t)REPLAY_CMD_SET_SPEED, 0, speed);
     }, 181, 73);
-    m_lblReplaySpeedUp = new Text(x0 + 240, y0 + 10, "assets/Arial.ttf", 18, "+", {0, 0, 0, 255});
+    m_lblReplaySpeedUp = new Text(0, 0, "assets/font.ttf", 18, "+", {255, 255, 255, 255});
+    m_btnReplaySpeedUp->centerObject(m_lblReplaySpeedUp);
 
-    m_inReplaySeekTick = new TextInput(x0 + 300, y0, 160, 40, "assets/Arial.ttf", 18);
+    m_inReplaySeekTick = new TextInput(x0 + 300, y0, 160, 40, "assets/font.ttf", 18);
     m_btnReplaySeek = new Button(x0 + 470, y0, 90, 40, "btn_generic", [this]() {
         if (!m_inReplaySeekTick) return;
         const std::string s = m_inReplaySeekTick->getString();
@@ -362,9 +365,10 @@ void SceneGame::EnsureReplayUI() {
         }
         SendReplayControl((uint32_t)REPLAY_CMD_SEEK_TICK, tick, 0.0f);
     }, 181, 73);
-    m_lblReplaySeek = new Text(x0 + 490, y0 + 10, "assets/Arial.ttf", 18, "Jump", {0, 0, 0, 255});
+    m_lblReplaySeek = new Text(0, 0, "assets/font.ttf", 18, "Jump", {255, 255, 255, 255});
+    m_btnReplaySeek->centerObject(m_lblReplaySeek);
 
-    m_lblReplayStatus = new Text(x0, y0 + 50, "assets/Arial.ttf", 16, "Replay: connecting...", {255, 255, 0, 255});
+    m_lblReplayStatus = new Text(x0, y0 + 50, "assets/font.ttf", 16, "Replay: connecting...", {255, 255, 0, 255});
 }
 
 void SceneGame::DestroyReplayUI() {
@@ -402,10 +406,7 @@ bool SceneGame::onEnter() {
 
     m_font = TTF_OpenFont("assets/font.ttf", 20);
     if (!m_font) {
-        m_font = TTF_OpenFont("assets/Arial.ttf", 20);
-    }
-    if (!m_font) {
-        std::cout << "SceneGame: Warning: Failed to load font (assets/font.ttf / assets/Arial.ttf)" << std::endl;
+        std::cout << "SceneGame: Warning: Failed to load font (assets/font.ttf)" << std::endl;
     }
 
     // Local terrain (visual only). Server-side terrain deformation is not replicated yet.

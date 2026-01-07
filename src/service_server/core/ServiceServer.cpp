@@ -618,6 +618,16 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
                 PacketUtils::SendPacket(clientSocket, PacketType::RES_GET_USER_LIST, res);
             }
             break;
+
+            case PacketType::REQ_GET_PROFILE: {
+                // Use the authenticated session user (ignore payload to avoid spoofing).
+                ResGetProfile res;
+                if (!mAuthServer.getProfile(currentUsername, res)) {
+                    // getProfile already filled res with error message.
+                }
+                PacketUtils::SendPacket(clientSocket, PacketType::RES_GET_PROFILE, res);
+            }
+            break;
             // -------------------------------------------------------------------------------------------------------------------------------------------
             default:
                 std::cerr << "Thread Client received unknown packet type: " << static_cast<int>(header.type) << std::endl;

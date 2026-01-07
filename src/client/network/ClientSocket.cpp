@@ -169,3 +169,12 @@ bool ClientSocket::SendCancelMatch() {
     // Usually UI update is immediate.
     return true;
 }
+
+bool ClientSocket::SendGetProfile() {
+    if (!mIsConnected) return false;
+    ReqGetProfile req;
+    std::memset(&req, 0, sizeof(req));
+    // Server will use session username; still fill for completeness.
+    std::strncpy(req.username, mUsername.c_str(), sizeof(req.username) - 1);
+    return PacketUtils::SendPacket(mSocket, PacketType::REQ_GET_PROFILE, req);
+}

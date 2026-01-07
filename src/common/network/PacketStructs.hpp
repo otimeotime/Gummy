@@ -72,9 +72,24 @@ typedef struct {
 } ReqGetProfile;
 
 typedef struct {
+    uint32_t matchId;
+    char endedAt[20];   // "YYYY-MM-DD HH:MM:SS" (19 chars + null)
+    char opponent[32];  // empty if unknown
+    int32_t myScore;
+    int32_t oppScore;
+    uint8_t result;     // 0 = loss, 1 = win, 2 = draw
+    char replayPath[256];
+} ProfileGameEntry;
+
+typedef struct {
+    bool isSuccess;
     char username[32];
     char info[1000];
     char createdAt[20];
+    int32_t elo;
+    uint32_t gameCount;
+    ProfileGameEntry games[20];
+    char message[100];
 } ResGetProfile;
 // --------------------------------------------------------
 // Game Room Packets --------------------------------------

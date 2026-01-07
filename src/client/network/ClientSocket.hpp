@@ -44,6 +44,9 @@ public:
     bool SendCancelMatch();
     bool SendMatchDecision(bool accepted, uint32_t matchId);
     bool CheckNotifications(Packet& outPacket);
+
+    // Profile
+    bool SendGetProfile();
 };
 
 #endif // CLIENT_SOCKET_H

@@ -44,6 +44,9 @@ public:
     // Check if Backspace was pressed this frame
     bool isBackspaceDown() { return m_isBackspace; }
 
+    // Mouse wheel delta for the current frame (positive = scroll up)
+    int getMouseWheelY() const { return m_mouseWheelY; }
+
 private:
     InputHandler();
     ~InputHandler();
@@ -55,4 +58,6 @@ private:
 
     std::string m_inputText = "";
     bool m_isBackspace = false;
+
+    int m_mouseWheelY = 0;
 };

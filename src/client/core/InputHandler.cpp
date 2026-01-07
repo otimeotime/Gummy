@@ -26,6 +26,9 @@ void InputHandler::update() {
     for(int i = 0; i < 3; i++) {
         mouseButtonJustPressed[i] = false;
     }
+
+    // Reset mouse wheel delta per frame
+    m_mouseWheelY = 0;
 }
 
 void InputHandler::updateEvent(SDL_Event& event) {
@@ -60,6 +63,10 @@ void InputHandler::updateEvent(SDL_Event& event) {
     if(event.type == SDL_MOUSEMOTION) {
         mousePosition->x = (float)event.motion.x;
         mousePosition->y = (float)event.motion.y;
+    }
+
+    if (event.type == SDL_MOUSEWHEEL) {
+        m_mouseWheelY += event.wheel.y;
     }
 
     // Update Keyboard Events
@@ -108,4 +115,5 @@ void InputHandler::reset() {
     }
     m_inputText = "";
     m_isBackspace = false;
+    m_mouseWheelY = 0;
 }

@@ -16,12 +16,12 @@ public:
 
         // 1. Add a Static Label (Text)
         // Position: (300, 150), Font size: 24, Color: Red
-        Text* lblName = new Text(300, 150, "assets/Arial.ttf", 24, "Enter Username:", {255, 0, 0, 255});
+        Text* lblName = new Text(300, 150, "assets/font.ttf", 24, "Enter Username:", {255, 0, 0, 255});
         m_uiObjects.push_back(lblName);
 
         // 2. Add an Input Field (TextInput)
         // Position: (300, 200), Width: 250, Height: 40
-        TextInput* inputName = new TextInput(300, 200, 250, 40, "assets/Arial.ttf", 20);
+        TextInput* inputName = new TextInput(300, 200, 250, 40, "assets/font.ttf", 20);
         m_uiObjects.push_back(inputName);
 
         // 3. Add a Submit Button (Using your Button class)

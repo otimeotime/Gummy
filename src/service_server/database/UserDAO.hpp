@@ -3,8 +3,10 @@
 
 #pragma once
 #include "DatabaseServer.hpp"
+#include <cstdint>
 #include <string>
 #include <optional>
+#include <vector>
 #include <iostream>
 #include <mutex>
 
@@ -14,6 +16,25 @@ struct UserData {
     std::string username;
     int elo;
     std::string password;
+};
+
+struct ProfileHeaderData {
+    long id = 0;
+    std::string username;
+    int elo = 0;
+    std::string info;
+    std::string createdAt; // "YYYY-MM-DD HH:MM:SS"
+};
+
+struct RecentMatchData {
+    uint32_t matchId = 0;
+    std::string endedAt;   // "YYYY-MM-DD HH:MM:SS" or empty
+    std::string opponent;  // may be empty
+    int myScore = 0;
+    int oppScore = 0;
+    bool isDraw = false;
+    uint32_t winnerUserId = 0; // 0 if draw/unknown
+    std::string logPath;
 };
 
 class UserDAO {
@@ -39,6 +60,9 @@ public:
     bool updateUsername(long userId, const std::string& newUsername);
     
     std::optional<UserData> getUserById(long userId);
+
+    std::optional<ProfileHeaderData> getProfileHeaderByUsername(const std::string& username);
+    std::vector<RecentMatchData> getRecentMatchesForUser(long userId, int limit = 20);
 };
 
 #endif // USERDAO_HPP

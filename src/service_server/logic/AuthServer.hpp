@@ -3,6 +3,7 @@
 
 #pragma once
 #include "../../common/network/Packet.hpp"
+#include "../../common/network/PacketStructs.hpp"
 #include "../database/UserDAO.hpp"
 #include "../database/DatabaseServer.hpp"
 #include <iostream>
@@ -25,6 +26,8 @@ public:
     bool changePassword(long userId, const std::string& newPassword);
 
     std::vector<UserData> getAllUsers();
+
+    bool getProfile(const std::string& username, ResGetProfile& outProfile);
     
 };
 
