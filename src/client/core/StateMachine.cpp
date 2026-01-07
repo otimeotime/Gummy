@@ -107,6 +107,8 @@ void StateMachine::applyPending() {
 }
 
 void StateMachine::pushState(GameState *pState) {
+    // Clear input to prevent ghost clicks in newly pushed state.
+    InputHandler::getInstance()->reset();
     m_gameStates.push_back(pState);
     m_gameStates.back()->onEnter();
 }

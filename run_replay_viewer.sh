@@ -8,6 +8,11 @@ SERVER_BIN="$ROOT_DIR/ingame_server_demo"
 VIEWER_BIN="$ROOT_DIR/net_game_client"
 
 IP="${IP:-127.0.0.1}"
+# Track whether the caller explicitly chose a port (env PORT or --port).
+PORT_EXPLICIT=0
+if [[ -n "${PORT+x}" ]]; then
+  PORT_EXPLICIT=1
+fi
 PORT="${PORT:-9090}"
 MAP_PATH_DEFAULT="assets/maps/flatmap.txt"
 
@@ -38,6 +43,7 @@ while [[ $# -gt 0 ]]; do
     --ip)
       IP="${2:-}"; shift 2;;
     --port)
+      PORT_EXPLICIT=1
       PORT="${2:-}"; shift 2;;
     --map)
       MAP_PATH="${2:-}"; shift 2;;
@@ -58,6 +64,23 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# If the user didn't explicitly pick a port (and no PORT env override), avoid
+# colliding with an active ingame server by picking a free port in 9090-9099.
+if [[ "${PORT}" == "9090" && "$PORT_EXPLICIT" -eq 0 ]]; then
+  # Best-effort check: if something is already accepting on 9090, pick another.
+  if (exec 3<>"/dev/tcp/$IP/$PORT") 2>/dev/null; then
+    exec 3>&-; exec 3<&-;
+    for p in 9091 9092 9093 9094 9095 9096 9097 9098 9099; do
+      if (exec 3<>"/dev/tcp/$IP/$p") 2>/dev/null; then
+        exec 3>&-; exec 3<&-;
+        continue
+      fi
+      PORT="$p"
+      break
+    done
+  fi
+fi
 
 if [[ -z "$REPLAY_PATH" ]]; then
   echo "[Error] replay file path required" >&2

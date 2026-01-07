@@ -11,6 +11,11 @@
 #include <cstring>
 #include <iostream>
 
+#if defined(__unix__) || defined(__APPLE__)
+#include <unistd.h>
+#include <sys/types.h>
+#endif
+
 namespace {
 void SafeCopy(char* dst, size_t dstSize, const std::string& s) {
     if (!dst || dstSize == 0) return;
@@ -22,6 +27,38 @@ std::string ResultToString(uint8_t r) {
     if (r == 1) return "WIN";
     if (r == 2) return "DRAW";
     return "LOSS";
+}
+
+void LaunchReplayViewerProcess(const std::string& replayPath, const std::string& username) {
+    if (replayPath.empty()) return;
+#if defined(__unix__) || defined(__APPLE__)
+    pid_t pid = fork();
+    if (pid < 0) {
+        std::perror("fork(run_replay_viewer.sh)");
+        return;
+    }
+    if (pid == 0) {
+        if (username.empty()) {
+            execl("./run_replay_viewer.sh", "./run_replay_viewer.sh", replayPath.c_str(), (char*)nullptr);
+        } else {
+            execl("./run_replay_viewer.sh",
+                  "./run_replay_viewer.sh",
+                  replayPath.c_str(),
+                  "--username",
+                  username.c_str(),
+                  (char*)nullptr);
+        }
+        std::perror("execl(run_replay_viewer.sh)");
+        _exit(127);
+    }
+#else
+    std::string cmd = "./run_replay_viewer.sh \"" + replayPath + "\"";
+    if (!username.empty()) {
+        cmd += " --username \"" + username + "\"";
+    }
+    cmd += " &";
+    std::system(cmd.c_str());
+#endif
 }
 }
 
@@ -50,7 +87,7 @@ bool SceneViewProfile::onEnter() {
     // Center header texts
     m_lblUsername = new Text(0, 0, "assets/font.ttf", 42, m_username, {255, 255, 255, 255});
     m_lblCreatedAt = new Text(0, 0, "assets/font.ttf", 18, "", {220, 220, 220, 255});
-    m_lblElo = new Text(0, 0, "assets/font.ttf", 20, "", {255, 255, 255, 255});
+    m_lblElo = new Text(0, 0, "assets/font.ttf", 30, "", {255, 255, 255, 255});
 
     m_uiObjects.push_back(m_lblUsername);
     m_uiObjects.push_back(m_lblCreatedAt);
@@ -79,6 +116,20 @@ void SceneViewProfile::clearHistoryTexts() {
         delete t;
     }
     m_historyTexts.clear();
+
+    for (auto* b : m_historyReplayButtons) {
+        if (!b) continue;
+        b->clean();
+        delete b;
+    }
+    m_historyReplayButtons.clear();
+
+    for (auto* t : m_historyReplayLabels) {
+        if (!t) continue;
+        t->clean();
+        delete t;
+    }
+    m_historyReplayLabels.clear();
 }
 
 void SceneViewProfile::rebuildHistoryTexts() {
@@ -92,10 +143,14 @@ void SceneViewProfile::rebuildHistoryTexts() {
 
     const uint32_t count = std::min<uint32_t>(m_profile.gameCount, 20);
     m_historyTexts.reserve(count);
+    m_historyReplayButtons.reserve(count);
+    m_historyReplayLabels.reserve(count);
 
-    // Build one line per game (simple frame text for now)
-    for (uint32_t i = 0; i < count; ++i) {
-        const ProfileGameEntry& g = m_profile.games[i];
+    // Build one line per game (most recent on top)
+    for (int idx = (int)count - 1; idx >= 0; --idx) {
+        const ProfileGameEntry& g = m_profile.games[idx];
+
+        const std::string replayPath = g.replayPath;
 
         std::string opp = g.opponent;
         if (opp.empty()) opp = "Unknown";
@@ -116,6 +171,28 @@ void SceneViewProfile::rebuildHistoryTexts() {
 
         Text* t = new Text(0, 0, "assets/font.ttf", 18, line, c);
         m_historyTexts.push_back(t);
+
+        Button* btn = new Button(0, 0, 120, 40, "btn_generic", [this, replayPath]() {
+            if (replayPath.empty()) {
+                if (m_lblStatus) {
+                    m_lblStatus->setText("Replay not available for this match.");
+                    m_lblStatus->setColor({255, 80, 80, 255});
+                }
+                return;
+            }
+            LaunchReplayViewerProcess(replayPath, m_username);
+        }, 181, 73);
+
+        Text* lbl = new Text(0, 0, "assets/font.ttf", 16, "REPLAY", {255, 255, 255, 255});
+
+        if (replayPath.empty()) {
+            btn->setEnabled(false);
+            btn->setStrokeColor({150, 150, 150, 255});
+            lbl->setColor({150, 150, 150, 255});
+        }
+
+        m_historyReplayButtons.push_back(btn);
+        m_historyReplayLabels.push_back(lbl);
     }
 
     m_scrollY = 0;
@@ -159,16 +236,68 @@ void SceneViewProfile::update() {
     }
 
     // Scroll wheel for history
+    {
+        const int screenW = 1280;
+        const int screenH = 720;
+        const int x0 = 80;
+        const int y0 = 250;
+        const int w = screenW - 2 * x0;
+        (void)w;
+        const int h = screenH - y0 - 60;
+
+        const int rowH = 78;
+        const int padding = 18;
+        const int totalRows = (int)m_historyTexts.size();
+        const int contentH = padding + totalRows * rowH + padding;
+        m_scrollMax = std::max(0, contentH - h);
+        m_scrollY = std::max(0, std::min(m_scrollY, m_scrollMax));
+    }
+
     const int wheel = InputHandler::getInstance()->getMouseWheelY();
     if (wheel != 0) {
         // wheel positive = up, negative = down
-        const int step = 32;
+        const int step = 48;
         m_scrollY -= wheel * step;
         m_scrollY = std::max(0, std::min(m_scrollY, m_scrollMax));
     }
 
     for (auto* t : m_historyTexts) {
         if (t) t->update();
+    }
+
+    // Update replay buttons (only when visible in the panel)
+    {
+        const int screenW = 1280;
+        const int screenH = 720;
+        const int x0 = 80;
+        const int y0 = 250;
+        const int w = screenW - 2 * x0;
+        const int h = screenH - y0 - 60;
+
+        const int rowH = 78;
+        const int padding = 18;
+        const int btnW = 120;
+        const int btnH = 40;
+
+        const int totalRows = (int)m_historyReplayButtons.size();
+        for (int i = 0; i < totalRows; ++i) {
+            const int rowTop = y0 + padding + i * rowH - m_scrollY;
+            const int rowBottom = rowTop + rowH;
+            if (rowBottom < y0 || rowTop > y0 + h) continue;
+
+            Button* btn = m_historyReplayButtons[i];
+            Text* lbl = (i < (int)m_historyReplayLabels.size()) ? m_historyReplayLabels[i] : nullptr;
+            if (!btn) continue;
+
+            const int btnX = x0 + w - padding - btnW - 16;
+            const int btnY = rowTop + (rowH - btnH) / 2;
+            btn->setPosition((float)btnX, (float)btnY);
+            btn->update();
+
+            if (lbl) {
+                btn->centerObject(lbl);
+            }
+        }
     }
 }
 
@@ -189,7 +318,7 @@ void SceneViewProfile::drawHistoryPanel() {
     TextureManager::getInstance()->drawFillRect(x0, y0, w, h, 0, 0, 0, 160, renderer);
     TextureManager::getInstance()->drawFillRect(x0, y0, w, 2, 255, 255, 255, 200, renderer);
 
-    const int rowH = 44;
+    const int rowH = 78;
     const int padding = 18;
 
     const int totalRows = (int)m_historyTexts.size();
@@ -205,13 +334,29 @@ void SceneViewProfile::drawHistoryPanel() {
         if (rowBottom < y0 || rowTop > y0 + h) continue;
 
         // Card background
-        TextureManager::getInstance()->drawFillRect(x0 + padding, rowTop, w - 2 * padding, rowH - 8, 0, 0, 0, 120, renderer);
+        TextureManager::getInstance()->drawFillRect(x0 + padding, rowTop, w - 2 * padding, rowH - 12, 0, 0, 0, 120, renderer);
         TextureManager::getInstance()->drawFillRect(x0 + padding, rowTop, w - 2 * padding, 1, 255, 255, 255, 120, renderer);
 
         Text* t = m_historyTexts[i];
         if (!t) continue;
-        t->setPosition((float)(x0 + padding + 16), (float)(rowTop + 10));
+        t->setPosition((float)(x0 + padding + 16), (float)(rowTop + 22));
         t->draw();
+
+        if (i < (int)m_historyReplayButtons.size() && m_historyReplayButtons[i]) {
+            Button* btn = m_historyReplayButtons[i];
+            Text* lbl = (i < (int)m_historyReplayLabels.size()) ? m_historyReplayLabels[i] : nullptr;
+
+            const int btnW = 120;
+            const int btnH = 40;
+            const int btnX = x0 + w - padding - btnW - 16;
+            const int btnY = rowTop + (rowH - btnH) / 2;
+            btn->setPosition((float)btnX, (float)btnY);
+            btn->draw();
+            if (lbl) {
+                btn->centerObject(lbl);
+                lbl->draw();
+            }
+        }
     }
 }
 

@@ -46,6 +46,10 @@ private:
     // Pre-rendered history rows (rebuilt when profile arrives)
     std::vector<Text*> m_historyTexts;
 
+    // Per-row replay buttons (same ordering as m_historyTexts)
+    std::vector<Button*> m_historyReplayButtons;
+    std::vector<Text*> m_historyReplayLabels;
+
     void rebuildHistoryTexts();
     void clearHistoryTexts();
 

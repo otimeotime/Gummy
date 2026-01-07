@@ -312,6 +312,9 @@ void SceneDashboard::update() {
              std::cout << "[Dashboard] Search Pending Confirmed by Server." << std::endl;
              m_isSearching = true;
              m_searchStartTime = SDL_GetTicks();
+             // Prevent the click used to press FIND MATCH from immediately
+             // triggering the CANCEL button (it appears in the same position).
+             InputHandler::getInstance()->reset();
         }
         else if (packet.header.type == PacketType::REQ_MATCH_DECIDE_1) {
             std::cout << "[Dashboard] Match Found! Displaying popup." << std::endl;
@@ -320,6 +323,9 @@ void SceneDashboard::update() {
             m_isSearching = false;
             m_showMatchPopup = true;
             m_hasMatchDecision = false;
+            // If the popup appears while the user is still holding a mouse button,
+            // avoid auto-clicking Accept/Decline.
+            InputHandler::getInstance()->reset();
         }
         else if (packet.header.type == PacketType::RES_MATCH_DECIDE_2) {
              std::cout << "[Dashboard] Match Confirmed! Starting Game..." << std::endl;
