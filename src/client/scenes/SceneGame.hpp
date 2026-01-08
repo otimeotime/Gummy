@@ -29,7 +29,8 @@ public:
               std::string mapPath = "assets/maps/flatmap.txt",
               std::string username = "",
               uint32_t matchId = 0,
-              uint32_t userId = 0);
+              uint32_t userId = 0,
+              bool allowSpectator = true); // Default allow for standalone viewer
 
     bool onEnter() override;
     bool onExit() override;
@@ -96,6 +97,8 @@ private:
 
     std::string m_mapPath;
     std::string m_username;
+    bool m_allowSpectator;
+    bool m_initFailed = false; // Flag to trigger pop state on update
     MapLoader* m_mapLoader;
     SDL_Texture* m_mapTexture;
     bool m_mapModified;

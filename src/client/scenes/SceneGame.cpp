@@ -30,7 +30,7 @@ void DrawCircleOutline(SDL_Renderer* renderer, int cx, int cy, int r) {
 }
 } // namespace
 
-SceneGame::SceneGame(std::string serverIp, int serverPort, std::string mapPath, std::string username, uint32_t matchId, uint32_t userId)
+SceneGame::SceneGame(std::string serverIp, int serverPort, std::string mapPath, std::string username, uint32_t matchId, uint32_t userId, bool allowSpectator)
     : m_serverIp(std::move(serverIp)),
       m_serverPort(serverPort),
       m_running(false),
@@ -43,8 +43,9 @@ SceneGame::SceneGame(std::string serverIp, int serverPort, std::string mapPath, 
       m_bgTextureID(""),
       m_playerID(""),
       m_bulletID(""),
-                                                m_mapPath(std::move(mapPath)),
-                                                m_username(std::move(username)),
+      m_mapPath(std::move(mapPath)),
+      m_username(std::move(username)),
+      m_allowSpectator(allowSpectator),
             m_mapLoader(nullptr),
             m_mapTexture(nullptr),
             m_mapModified(true),
@@ -450,6 +451,13 @@ bool SceneGame::onEnter() {
         std::cout << "SceneGame: joined match " << m_matchId << " as player " << m_playerId << std::endl;
 
         if (m_playerId == UINT32_MAX) {
+            // Check explicit spectator permission
+            if (!m_allowSpectator) {
+                std::cerr << "SceneGame Error: Connected as spectator but spectator mode disallowed!" << std::endl;
+                std::cerr << "           (Connected to port " << m_serverPort << " which might be a zombie replay server)" << std::endl;
+                m_initFailed = true;
+                return false;
+            }
             EnsureReplayUI();
             // Trigger an initial status response (harmless in live server; ignored there)
             SendReplayControl((uint32_t)REPLAY_CMD_SET_SPEED, 0, 1.0f);
@@ -1076,6 +1084,16 @@ void SceneGame::update() {
 }
 
 void SceneGame::render() {
+    if (m_initFailed) {
+        SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+        if (renderer) {
+           // Provide visual feedback if we are stuck for a frame
+           SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+           SDL_RenderClear(renderer);
+        }
+        return;
+    }
+
     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
     if (!renderer) return;
 

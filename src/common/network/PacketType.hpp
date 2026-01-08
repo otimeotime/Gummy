@@ -17,6 +17,13 @@ enum PacketType {
     RES_SEARCH_USER,
     REQ_GET_USER_LIST,
     RES_GET_USER_LIST,
+    // Challenge Packets
+    REQ_CHALLENGE_USER,         // Client A -> Server
+    REQ_CHALLENGE_REQUEST,      // Server -> Client B
+    RES_CHALLENGE_RESPONSE,     // Client B -> Server
+    REQ_CHALLENGE_FINAL_CONFIRM,// Server -> Client A
+    RES_CHALLENGE_FINAL_CONFIRM,// Client A -> Server
+    RES_CHALLENGE_DECLINED,     // Server -> Client A (If B declines)
     // Game Room Packets
     REQ_MATCH_FIND,
     RES_MATCH_FIND,

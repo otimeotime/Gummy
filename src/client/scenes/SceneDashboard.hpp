@@ -54,10 +54,68 @@ private:
 
     // Players List
     std::vector<PlayerStatusInfo> m_allPlayers;
-    std::vector<Text*> m_playerListTexts; // Separate list for dynamic UI
+    
+    struct PlayerEntry {
+        Text* label;
+        Button* clickArea;
+    };
+    std::vector<PlayerEntry> m_playerListUI;
     uint32_t m_lastRefreshTime;
 
-    // Matchmaking Popup
+    // Player Interaction Popup (Challenge/Profile)
+    bool m_showInteractPopup = false;
+    std::string m_targetPlayerName;
+    Button* m_btnChallenge = nullptr;
+    Text* m_lblChallenge = nullptr;
+    Button* m_btnViewOtherProfile = nullptr;
+    Text* m_lblViewOtherProfile = nullptr;
+    Button* m_btnCloseInteract = nullptr;
+    Text* m_lblCloseInteract = nullptr;
+
+    void drawInteractionPopup();
+    
+    // Incoming Challenge Popup
+    bool m_showIncomingChallenge = false;
+    std::string m_incomingChallengerName;
+    Text* m_lblIncomingTitle = nullptr;
+    Text* m_lblIncomingMsg = nullptr;
+    Button* m_btnIncomingAccept = nullptr;
+    Text* m_lblIncomingAccept = nullptr;
+    Button* m_btnIncomingDecline = nullptr;
+    Text* m_lblIncomingDecline = nullptr;
+
+    void drawIncomingChallengePopup();
+
+    // Final Confirm Popup (for Challenger)
+    bool m_showFinalConfirm = false;
+    std::string m_finalOpponentName;
+    Text* m_lblFinalTitle = nullptr;
+    Text* m_lblFinalMsg = nullptr;
+    Button* m_btnFinalYes = nullptr;
+    Text* m_lblFinalYes = nullptr;
+    Button* m_btnFinalNo = nullptr;
+    Text* m_lblFinalNo = nullptr;
+
+    void drawFinalConfirmPopup();
+
+    // Waiting for Response Popup (After sending challenge)
+    bool m_showWaitingResponse = false;
+    Text* m_lblWaitingResponse = nullptr;
+    Button* m_btnCancelWaiting = nullptr; // Or "Close"
+    Text* m_lblCancelWaiting = nullptr;
+    
+    void drawWaitingResponsePopup();
+
+    // Waiting for Final Confirm (Player B waiting for A)
+    bool m_showWaitingFinal = false;
+    bool m_waitingFinalCanClose = false; // Only true if error occurs
+    Text* m_lblWaitingFinal = nullptr;
+    Button* m_btnCloseWaitingFinal = nullptr;
+    Text* m_lblCloseWaitingFinal = nullptr;
+    uint32_t m_waitingFinalStartTime = 0; // Timer for timeout
+
+    void drawWaitingFinalPopup();
+
     bool m_showMatchPopup;
     bool m_hasMatchDecision; // If true, disable buttons
     uint32_t m_pendingMatchId;

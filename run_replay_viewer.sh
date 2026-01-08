@@ -13,7 +13,12 @@ PORT_EXPLICIT=0
 if [[ -n "${PORT+x}" ]]; then
   PORT_EXPLICIT=1
 fi
-PORT="${PORT:-9090}"
+if [[ "$PORT_EXPLICIT" -eq 0 ]]; then
+  # Pick a random port to avoid collisions with the default Service port (9090)
+  # range 10000-15000
+  PORT=$(( 10000 + RANDOM % 5000 ))
+fi
+PORT="${PORT:-9090}" # Fallback if random fails or blocked (unlikely)
 MAP_PATH_DEFAULT="assets/maps/flatmap.txt"
 
 usage() {

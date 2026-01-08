@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
 #include <cerrno>
 #include <signal.h>
 #include <sys/socket.h>
@@ -396,6 +397,7 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
                             {
                                 std::lock_guard<std::mutex> lock(mClientsMutex);
                                 mConnectedUsers.insert(currentUsername);
+                                mUserSockets[currentUsername] = clientSocket;
                             }
                         }
                     } else {
@@ -427,16 +429,10 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
                 if (!currentUsername.empty()) {
                     std::lock_guard<std::mutex> lock(mClientsMutex);
                     mConnectedUsers.erase(currentUsername);
+                    mUserSockets.erase(currentUsername);
                     currentUsername = "";
                     currentElo = 0;
                 }
-                // Do not disconnect socket, just end session context? Logic says keep loop running?
-                // The original code set connected = false.
-                // But the user changed client to NOT disconnect.
-                // So here, we should NOT set connected = false if we want re-login.
-                // BUT, if we keep loop, next packet might be LOGIN.
-                // Let's keep loop running.
-                // connected = false; // Commented out to allow re-login on same socket
             }
             break;
             // -------------------------------------------------------------------------------------------------------------------------------------------
@@ -620,15 +616,149 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
             break;
 
             case PacketType::REQ_GET_PROFILE: {
-                // Use the authenticated session user (ignore payload to avoid spoofing).
+                ReqGetProfile req = packet.GetPayload<ReqGetProfile>();
+                std::string targetUser = currentUsername;
+                
+                // If a specific username is requested, use it; otherwise fallback to self
+                if (req.username[0] != '\0') {
+                    targetUser = std::string(req.username);
+                }
+
                 ResGetProfile res;
-                if (!mAuthServer.getProfile(currentUsername, res)) {
-                    // getProfile already filled res with error message.
+                if (!mAuthServer.getProfile(targetUser, res)) {
+                    // getProfile failure (e.g. user not found)
+                    res.isSuccess = false;
+                    std::snprintf(res.message, sizeof(res.message), "User '%s' not found.", targetUser.c_str());
                 }
                 PacketUtils::SendPacket(clientSocket, PacketType::RES_GET_PROFILE, res);
             }
             break;
             // -------------------------------------------------------------------------------------------------------------------------------------------
+            case PacketType::REQ_CHALLENGE_USER: {
+                ReqChallengeUser req = packet.GetPayload<ReqChallengeUser>();
+                std::string target(req.targetUsername);
+
+                // Find target socket
+                TCPSocket* targetSocket = nullptr;
+                {
+                    std::lock_guard<std::mutex> lock(mClientsMutex);
+                    auto it = mUserSockets.find(target);
+                    if (it != mUserSockets.end()) {
+                        targetSocket = it->second;
+                    }
+                }
+
+                if (targetSocket) {
+                    // Send REQ_CHALLENGE_REQUEST to target
+                    ReqChallengeRequest outReq;
+                    std::strncpy(outReq.challengerUsername, currentUsername.c_str(), 31);
+                    outReq.challengerElo = currentElo;
+                    PacketUtils::SendPacket(targetSocket, PacketType::REQ_CHALLENGE_REQUEST, outReq);
+                } else {
+                    // Send DECLINED/Failed to challenger
+                    ResChallengeDeclined res;
+                    std::snprintf(res.reason, sizeof(res.reason), "User %s is not online", target.c_str());
+                    PacketUtils::SendPacket(clientSocket, PacketType::RES_CHALLENGE_DECLINED, res);
+                }
+            }
+            break;
+
+            case PacketType::RES_CHALLENGE_RESPONSE: {
+                ResChallengeResponse resp = packet.GetPayload<ResChallengeResponse>();
+                std::string challenger(resp.challengerUsername);
+                
+                // Find challenger socket to notify result
+                TCPSocket* challengerSocket = nullptr;
+                {
+                    std::lock_guard<std::mutex> lock(mClientsMutex);
+                    auto it = mUserSockets.find(challenger);
+                    if (it != mUserSockets.end()) {
+                        challengerSocket = it->second;
+                    }
+                }
+
+                if (!challengerSocket) {
+                    // Challenger went offline
+                    break;
+                }
+
+                if (!resp.accept) {
+                    // Target declined
+                    ResChallengeDeclined fail;
+                    std::snprintf(fail.reason, sizeof(fail.reason), "%s declined challenge", currentUsername.c_str());
+                    PacketUtils::SendPacket(challengerSocket, PacketType::RES_CHALLENGE_DECLINED, fail);
+                } else {
+                    // Target accepted!
+                    // Let's create a pending match now.
+                    {
+                        std::lock_guard<std::mutex> lock(mMatchmakingMutex);
+                        PendingMatch pm;
+                        pm.matchId = mNextMatchId++;
+                        pm.user1 = challenger;
+                        pm.socket1 = challengerSocket;
+                        pm.confirm1 = false; // Challenger needs final confirm
+                        pm.user2 = currentUsername; // Target (who just accepted)
+                        pm.socket2 = clientSocket;
+                        pm.confirm2 = true; // Target accepted by definition
+                        pm.startTime = std::chrono::steady_clock::now();
+                        mPendingMatches.push_back(pm);
+
+                        // Send FINAL_CONFIRM to Challenger
+                        ReqChallengeFinalConfirm finalReq;
+                        std::strncpy(finalReq.opponentUsername, currentUsername.c_str(), 31);
+                        PacketUtils::SendPacket(challengerSocket, PacketType::REQ_CHALLENGE_FINAL_CONFIRM, finalReq);
+                    }
+                }
+            }
+            break;
+
+            case PacketType::RES_CHALLENGE_FINAL_CONFIRM: {
+                ResChallengeFinalConfirm resp = packet.GetPayload<ResChallengeFinalConfirm>();
+                
+                std::lock_guard<std::mutex> lock(mMatchmakingMutex);
+                // Find pending match involving this user as user1
+                for (auto& pm : mPendingMatches) {
+                    if (pm.user1 == currentUsername && !pm.confirm1) {
+                        if (resp.accept) {
+                            pm.confirm1 = true;
+                            
+                            int portToUse = 0;
+                            if (!EnsureIngameServerRunning(pm.matchId, &portToUse)) {
+                                std::cerr << "Failed to start ingame server.\n";
+                                continue;
+                            }
+
+                            // Send InitGame to both
+                            InitGame init;
+                            init.matchId = pm.matchId;
+                            std::strncpy(init.host, mIngameHost.c_str(), sizeof(init.host));
+                            init.port = portToUse;
+                            std::string mapPath = mIngameMapPath;
+                            std::strncpy(init.mapPath, mapPath.c_str(), sizeof(init.mapPath));
+
+                            PacketUtils::SendPacket(pm.socket1, PacketType::INIT_GAME, init);
+                            PacketUtils::SendPacket(pm.socket2, PacketType::INIT_GAME, init);
+
+                            std::cout << "[Chain Challenge] Match started: " << pm.user1 << " vs " << pm.user2 << std::endl;
+                        } else {
+                            // Declined final confirm
+                            // Notify opponent (User2)
+                            ResChallengeDeclined dec;
+                            std::snprintf(dec.reason, sizeof(dec.reason), "%s cancelled the challenge", currentUsername.c_str());
+                            PacketUtils::SendPacket(pm.socket2, PacketType::RES_CHALLENGE_DECLINED, dec);
+                            
+                             pm.matchId = 0; // mark for deletion
+                        }
+                    }
+                }
+                 // Remove processed matches
+                mPendingMatches.erase(std::remove_if(mPendingMatches.begin(), mPendingMatches.end(),
+                    [](const PendingMatch& m) { return m.confirm1 && m.confirm2; }), mPendingMatches.end());
+                mPendingMatches.erase(std::remove_if(mPendingMatches.begin(), mPendingMatches.end(),
+                    [](const PendingMatch& m) { return m.matchId == 0; }), mPendingMatches.end());
+            }
+            break;
+
             default:
                 std::cerr << "Thread Client received unknown packet type: " << static_cast<int>(header.type) << std::endl;
                 break;

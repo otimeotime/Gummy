@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
+#include <filesystem>
 
 #if defined(__unix__) || defined(__APPLE__)
 #include <unistd.h>
@@ -31,6 +32,7 @@ std::string ResultToString(uint8_t r) {
 
 void LaunchReplayViewerProcess(const std::string& replayPath, const std::string& username) {
     if (replayPath.empty()) return;
+    std::cout << "[SceneViewProfile] Launching replay viewer for file: " << replayPath << " with username: " << username << std::endl;
 #if defined(__unix__) || defined(__APPLE__)
     pid_t pid = fork();
     if (pid < 0) {
@@ -98,13 +100,15 @@ bool SceneViewProfile::onEnter() {
 
     // Send request immediately
     std::cout << "[SceneViewProfile] Requesting profile..." << std::endl;
-    if (!Game::getInstance()->getClientSocket()->SendGetProfile()) {
+    // Pass m_username to request profile of THAT user
+    if (!Game::getInstance()->getClientSocket()->SendGetProfile(m_username)) {
         m_isLoading = false;
         if (m_lblStatus) {
             m_lblStatus->setText("Failed to send request.");
             m_lblStatus->setColor({255, 80, 80, 255});
         }
     }
+
 
     return true;
 }
@@ -146,6 +150,11 @@ void SceneViewProfile::rebuildHistoryTexts() {
     m_historyReplayButtons.reserve(count);
     m_historyReplayLabels.reserve(count);
 
+    // Get current logged-in user
+    const std::string currentLogin = Game::getInstance()->getClientSocket()->GetUsername();
+    // Check if we are viewing our own profile
+    bool isMyProfile = (m_username == currentLogin);
+
     // Build one line per game (most recent on top)
     for (int idx = (int)count - 1; idx >= 0; --idx) {
         const ProfileGameEntry& g = m_profile.games[idx];
@@ -172,20 +181,49 @@ void SceneViewProfile::rebuildHistoryTexts() {
         Text* t = new Text(0, 0, "assets/font.ttf", 18, line, c);
         m_historyTexts.push_back(t);
 
+        // ONLY show replay button if this is MY profile
+        if (!isMyProfile) {
+            // Push nulls or just don't push?
+            // drawHistoryPanel checks index < size. If we don't push, it won't draw.
+            // But we need to keep alignment if we used random access? 
+            // The drawing loop iterates 0..totalRows (based on text). 
+            // It checks if (i < buttons.size()). 
+            // So if we don't push anything, buttons.size() remains 0, and no buttons are drawn. 
+            // That works fine.
+            continue; 
+        }
+
+        bool fileExists = false;
+        if (!replayPath.empty()) {
+            // Check if file physically exists
+            // Handles cases where DB has record but file was deleted/missing (e.g. remote server)
+            std::error_code ec;
+            fileExists = std::filesystem::exists(replayPath, ec);
+        }
+
         Button* btn = new Button(0, 0, 120, 40, "btn_generic", [this, replayPath]() {
             if (replayPath.empty()) {
                 if (m_lblStatus) {
-                    m_lblStatus->setText("Replay not available for this match.");
+                    m_lblStatus->setText("Replay not available.");
                     m_lblStatus->setColor({255, 80, 80, 255});
                 }
                 return;
             }
+             // Double check existence (in case it was deleted after load)
+            if (!std::filesystem::exists(replayPath)) {
+                if (m_lblStatus) {
+                    m_lblStatus->setText("Replay file missing from disk.");
+                    m_lblStatus->setColor({255, 80, 80, 255});
+                }
+                return;
+            }
+
             LaunchReplayViewerProcess(replayPath, m_username);
         }, 181, 73);
 
         Text* lbl = new Text(0, 0, "assets/font.ttf", 16, "REPLAY", {255, 255, 255, 255});
 
-        if (replayPath.empty()) {
+        if (!fileExists) {
             btn->setEnabled(false);
             btn->setStrokeColor({150, 150, 150, 255});
             lbl->setColor({150, 150, 150, 255});

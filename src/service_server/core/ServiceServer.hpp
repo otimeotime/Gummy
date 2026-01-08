@@ -41,6 +41,8 @@ private:
 
     std::mutex mClientsMutex;
     std::unordered_set<std::string> mConnectedUsers;
+    // Map username to socket for direct messaging
+    std::map<std::string, TCPSocket*> mUserSockets; 
 
     // Matchmaking
     std::mutex mMatchmakingMutex;

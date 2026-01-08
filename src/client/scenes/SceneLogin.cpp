@@ -86,8 +86,8 @@ bool SceneLogin::onEnter() {
     // ---------------------------------------------------------
     // 1. SETUP RESOURCES
     // ---------------------------------------------------------
-    m_bannerTextureID = "Mario";
-    if (!TextureManager::getInstance()->load("assets/Mario.png", m_bannerTextureID, Game::getInstance()->getRenderer())) {
+    m_bannerTextureID = "Gummy_logo";
+    if (!TextureManager::getInstance()->load("assets/gummy_logo.png", m_bannerTextureID, Game::getInstance()->getRenderer())) {
         std::cout << "[SceneLogin] Failed to load banner image!" << std::endl;
     }
 
@@ -202,7 +202,7 @@ void SceneLogin::render() {
     // ---------------------------------------------------------
     // The screen is 1280 wide. Right side starts at x=640.
     // We draw the banner filling the right half (640x720).
-    TextureManager::getInstance()->drawStatic(
+    TextureManager::getInstance()->drawScaled(
         m_bannerTextureID,
         640, 0,         // X, Y (Start at middle of screen)
         640, 720,      // Width, Height (Fill right half)

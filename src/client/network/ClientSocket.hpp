@@ -46,7 +46,12 @@ public:
     bool CheckNotifications(Packet& outPacket);
 
     // Profile
-    bool SendGetProfile();
+    bool SendGetProfile(std::string targetUsername = "");
+
+    // Challenge
+    bool SendChallengeUser(const std::string& targetUsername);
+    bool SendChallengeResponse(bool accept, const std::string& challenger);
+    bool SendChallengeFinalConfirm(bool accept, const std::string& opponent);
 };
 
 #endif // CLIENT_SOCKET_H

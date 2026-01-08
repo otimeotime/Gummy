@@ -46,6 +46,35 @@ typedef struct {
     int dummy;
 } ReqGetUserList;
 
+// --- Challenge Packets ---
+typedef struct {
+    char targetUsername[32];
+} ReqChallengeUser;
+
+typedef struct {
+    char challengerUsername[32];
+    int32_t challengerElo;
+} ReqChallengeRequest;
+
+typedef struct {
+    bool accept;
+    char challengerUsername[32]; // Echo back to verify
+} ResChallengeResponse;
+
+typedef struct {
+    char opponentUsername[32];
+} ReqChallengeFinalConfirm;
+
+typedef struct {
+    bool accept;
+} ResChallengeFinalConfirm;
+
+typedef struct {
+    char reason[100];
+} ResChallengeDeclined;
+
+// -------------------------
+
 struct PlayerStatusInfo {
     char username[32];
     bool isOnline;

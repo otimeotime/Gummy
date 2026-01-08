@@ -116,7 +116,7 @@ bool SceneDashboard::onEnter() {
 
     // --- PLAYER LIST ---
     std::cout << "[SceneDashboard] Fetching user list..." << std::endl;
-    m_allPlayers = Game::getInstance()->getClientSocket()->GetUserList();
+    // Will be populated by refreshPlayerList() at end of onEnter
 
     // --- LEFT TITLE ---
     m_lblTitle = new Text(80, 60, "assets/font.ttf", 72, "GUMMY", {255, 255, 255, 255});
@@ -129,86 +129,76 @@ bool SceneDashboard::onEnter() {
 
     // --- MAIN CONTENT (Left Side) ---
     const int leftX = 80;
-    const int leftW = panelX - leftX - 40;
-    (void)leftW;
-
-    // 4 equal-size buttons stacked
     const int actionBtnW = 280;
     const int actionBtnH = 64;
     const int actionGap = 16;
-
-                // "FIND MATCH" Button (primary action)
-                const int playBtnY = 220;
-                m_btnFindMatch = new Button(leftX, playBtnY, actionBtnW, actionBtnH, "btn_generic", [this]() {
+            
+    // "FIND MATCH" Button
+    const int playBtnY = 220;
+    m_btnFindMatch = new Button(leftX, playBtnY, actionBtnW, actionBtnH, "btn_generic", [this]() {
         std::cout << "[SceneDashboard] Sending Find Match Request..." << std::endl;
         if(Game::getInstance()->getClientSocket()->SendFindMatch()) {
              std::cout << " > Request Sent. Waiting for server confirmation..." << std::endl;
-             // Do NOT start timer yet. Wait for RES_MATCH_FIND.
         } else {
              std::cout << " > Request Failed (Send Error)." << std::endl;
         }
     }, 181, 73);
-    // m_uiObjects.push_back(m_btnFindMatch); // Managed manually
 
     m_lblFindMatch = new Text(0, 0, "assets/font.ttf", 26, "FIND MATCH", {255, 255, 255, 255});
     m_btnFindMatch->centerObject(m_lblFindMatch);
-    // m_uiObjects.push_back(m_lblFindMatch); // Managed manually
 
-            // Cancel Search Button (same size/position as Find Match)
-            m_btnCancelSearch = new Button(leftX, playBtnY, actionBtnW, actionBtnH, "btn_generic", [this]() {
+    // Cancel Search Button
+    m_btnCancelSearch = new Button(leftX, playBtnY, actionBtnW, actionBtnH, "btn_generic", [this]() {
          std::cout << "[SceneDashboard] Cancelling Search..." << std::endl;
          Game::getInstance()->getClientSocket()->SendCancelMatch();
          m_isSearching = false;
     }, 181, 73);
 
-        m_lblSearchingTimer = new Text(leftX, playBtnY - 46, "assets/font.ttf", 22, "Searching... 00:00", {255, 255, 255, 255});
+    m_lblSearchingTimer = new Text(leftX, playBtnY - 46, "assets/font.ttf", 22, "Searching... 00:00", {255, 255, 255, 255});
 
-        // VIEW PROFILE button (between Find Match and Replay)
-        const int viewProfileBtnY = playBtnY + actionBtnH + actionGap;
-        m_btnViewProfile = new Button(leftX, viewProfileBtnY, actionBtnW, actionBtnH, "btn_generic", [this]() {
-            // Send request then switch screen immediately.
-            Game::getInstance()->getClientSocket()->SendGetProfile();
-            Game::getInstance()->getStateMachine()->pushState(new SceneViewProfile(m_username));
-        }, 181, 73);
-        m_lblViewProfile = new Text(0, 0, "assets/font.ttf", 22, "VIEW PROFILE", {255, 255, 255, 255});
-        m_btnViewProfile->centerObject(m_lblViewProfile);
-        m_uiObjects.push_back(m_btnViewProfile);
-        m_uiObjects.push_back(m_lblViewProfile);
+    // VIEW PROFILE button
+    const int viewProfileBtnY = playBtnY + actionBtnH + actionGap;
+    m_btnViewProfile = new Button(leftX, viewProfileBtnY, actionBtnW, actionBtnH, "btn_generic", [this]() {
+        Game::getInstance()->getClientSocket()->SendGetProfile();
+        Game::getInstance()->getStateMachine()->pushState(new SceneViewProfile(m_username));
+    }, 181, 73);
+    m_lblViewProfile = new Text(0, 0, "assets/font.ttf", 22, "VIEW PROFILE", {255, 255, 255, 255});
+    m_btnViewProfile->centerObject(m_lblViewProfile);
+    m_uiObjects.push_back(m_btnViewProfile);
+    m_uiObjects.push_back(m_lblViewProfile);
 
-        // REPLAY button (opens popup)
-        const int replayBtnY = viewProfileBtnY + actionBtnH + actionGap;
-        m_btnReplay = new Button(leftX, replayBtnY, actionBtnW, actionBtnH, "btn_generic", [this]() {
-            m_showReplayPopup = true;
-        }, 181, 73);
-        m_lblReplay = new Text(0, 0, "assets/font.ttf", 22, "REPLAY", {255, 255, 255, 255});
-        m_btnReplay->centerObject(m_lblReplay);
-        m_uiObjects.push_back(m_btnReplay);
-        m_uiObjects.push_back(m_lblReplay);
+    // REPLAY button
+    const int replayBtnY = viewProfileBtnY + actionBtnH + actionGap;
+    m_btnReplay = new Button(leftX, replayBtnY, actionBtnW, actionBtnH, "btn_generic", [this]() {
+        m_showReplayPopup = true;
+    }, 181, 73);
+    m_lblReplay = new Text(0, 0, "assets/font.ttf", 22, "REPLAY", {255, 255, 255, 255});
+    m_btnReplay->centerObject(m_lblReplay);
+    m_uiObjects.push_back(m_btnReplay);
+    m_uiObjects.push_back(m_lblReplay);
 
-        // LOGOUT button (below replay)
-        const int logoutBtnY = replayBtnY + actionBtnH + actionGap;
-        Button* btnLogout = new Button(leftX, logoutBtnY, actionBtnW, actionBtnH, "btn_generic", []() {
-            Game::getInstance()->getClientSocket()->Logout();
-            Game::getInstance()->getStateMachine()->changeState(new SceneLogin());
-        }, 181, 73);
-        Text* lblLogout = new Text(0, 0, "assets/font.ttf", 22, "LOGOUT", {255, 255, 255, 255});
-        btnLogout->centerObject(lblLogout);
-        m_uiObjects.push_back(btnLogout);
-        m_uiObjects.push_back(lblLogout);
+    // LOGOUT button
+    const int logoutBtnY = replayBtnY + actionBtnH + actionGap;
+    Button* btnLogout = new Button(leftX, logoutBtnY, actionBtnW, actionBtnH, "btn_generic", []() {
+        Game::getInstance()->getClientSocket()->Logout();
+        Game::getInstance()->getStateMachine()->changeState(new SceneLogin());
+    }, 181, 73);
+    Text* lblLogout = new Text(0, 0, "assets/font.ttf", 22, "LOGOUT", {255, 255, 255, 255});
+    btnLogout->centerObject(lblLogout);
+    m_uiObjects.push_back(btnLogout);
+    m_uiObjects.push_back(lblLogout);
 
-        // QUIT button (below logout)
-        const int quitBtnY = logoutBtnY + actionBtnH + actionGap;
-        Button* btnQuit = new Button(leftX, quitBtnY, actionBtnW, actionBtnH, "btn_generic", []() {
-            Game::getInstance()->quit();
-        }, 181, 73);
-        Text* lblQuit = new Text(0, 0, "assets/font.ttf", 22, "QUIT", {255, 255, 255, 255});
-        btnQuit->centerObject(lblQuit);
-        m_uiObjects.push_back(btnQuit);
-        m_uiObjects.push_back(lblQuit);
+    // QUIT button
+    const int quitBtnY = logoutBtnY + actionBtnH + actionGap;
+    Button* btnQuit = new Button(leftX, quitBtnY, actionBtnW, actionBtnH, "btn_generic", []() {
+        Game::getInstance()->quit();
+    }, 181, 73);
+    Text* lblQuit = new Text(0, 0, "assets/font.ttf", 22, "QUIT", {255, 255, 255, 255});
+    btnQuit->centerObject(lblQuit);
+    m_uiObjects.push_back(btnQuit);
+    m_uiObjects.push_back(lblQuit);
 
-    // --- REPLAY WATCH (single-user) ---
-    // Start the replay viewer directly (it will start the replay server internally).
-    // Replay popup UI (created once; drawn conditionally)
+    // --- REPLAY WATCH POPUP ---
     m_lblReplayPopupTitle = new Text(0, 0, "assets/font.ttf", 28, "REPLAY", {255, 255, 255, 255});
     m_lblReplayPopupHint = new Text(0, 0, "assets/font.ttf", 16, "Directory / file", {200, 200, 200, 255});
     m_inReplayDir = new TextInput(0, 0, 560, 40, "assets/font.ttf", 18);
@@ -216,7 +206,6 @@ bool SceneDashboard::onEnter() {
         if (!m_inReplayDir) return;
         const std::string replayPath = m_inReplayDir->getString();
         if (replayPath.empty()) return;
-        std::cout << "[SceneDashboard] Launching replay viewer for: " << replayPath << std::endl;
         LaunchReplayViewerProcess(replayPath, m_username);
         m_showReplayPopup = false;
     }, 181, 73);
@@ -226,36 +215,114 @@ bool SceneDashboard::onEnter() {
     }, 181, 73);
     m_lblReplayCancel = new Text(0, 0, "assets/font.ttf", 18, "CANCEL", {255, 255, 255, 255});
 
-    // --- POPUP MENU BUTTONS (Hidden initially) ---
-    // ... (Existing code) ...
-
     // --- MATCHMAKING POPUP ---
     const int popupCX = (screenW - panelW) / 2;
     const int popupCY = screenH / 2;
     m_lblMatchFound = new Text( popupCX - 120, popupCY - 120, "assets/font.ttf", 32, "MATCH FOUND!", {255, 255, 255, 255});
     m_lblMatchStatus = new Text( popupCX - 160, popupCY - 40, "assets/font.ttf", 20, "", {255, 255, 255, 255});
-
     m_lblAccept = new Text(0, 0, "assets/font.ttf", 20, "Accept", {255, 255, 255, 255});
     m_lblDecline = new Text(0, 0, "assets/font.ttf", 20, "Decline", {255, 255, 255, 255});
     
-     m_btnAccept = new Button(popupCX - 120, popupCY + 20, 140, 48, "btn_generic", [this]() {
-         std::cout << "Accepted Match!" << std::endl;
-            Game::getInstance()->getClientSocket()->SendMatchDecision(true, m_pendingMatchId);
-         m_hasMatchDecision = true;
-         m_lblMatchStatus->setText("Waiting for opponent...");
-         m_lblMatchStatus->setColor({255, 255, 0, 255});
+    m_btnAccept = new Button(popupCX - 120, popupCY + 20, 140, 48, "btn_generic", [this]() {
+        Game::getInstance()->getClientSocket()->SendMatchDecision(true, m_pendingMatchId);
+        m_hasMatchDecision = true;
+        m_lblMatchStatus->setText("Waiting for opponent...");
+        m_lblMatchStatus->setColor({255, 255, 0, 255});
     }, 181, 73);
     
-     m_btnDecline = new Button(popupCX + 10, popupCY + 20, 140, 48, "btn_generic", [this]() {
-         std::cout << "Declined Match!" << std::endl;
-            Game::getInstance()->getClientSocket()->SendMatchDecision(false, m_pendingMatchId);
-         // m_showMatchPopup = false; // Maybe wait for server? Or just close?
-         // If declined, server cancels match for both.
-         m_hasMatchDecision = true;
-         m_lblMatchStatus->setText("You declined.");
-         m_lblMatchStatus->setColor({255, 0, 0, 255});
-         // Close after short delay? Or immediately?
-         m_showMatchPopup = false;
+    m_btnDecline = new Button(popupCX + 10, popupCY + 20, 140, 48, "btn_generic", [this]() {
+        Game::getInstance()->getClientSocket()->SendMatchDecision(false, m_pendingMatchId);
+        m_hasMatchDecision = true;
+        m_lblMatchStatus->setText("You declined.");
+        m_lblMatchStatus->setColor({255, 0, 0, 255});
+        m_showMatchPopup = false;
+    }, 181, 73);
+
+    // --- INTERACTION POPUP (Player Click) ---
+    // m_lblChallenge Removed
+    m_lblViewOtherProfile = new Text(0, 0, "assets/font.ttf", 20, "Profile", {255,255,255,255});
+    m_lblCloseInteract = new Text(0, 0, "assets/font.ttf", 18, "Close", {200,200,200,255});
+    
+    // m_btnChallenge Removed
+    
+    m_btnViewOtherProfile = new Button(0, 0, 300, 60, "btn_generic", [this]() {
+        std::cout << "[Dashboard] Viewing profile of " << m_targetPlayerName << std::endl;
+        Game::getInstance()->getClientSocket()->SendGetProfile(m_targetPlayerName);
+        Game::getInstance()->getStateMachine()->pushState(new SceneViewProfile(m_targetPlayerName));
+        m_showInteractPopup = false;
+    }, 181, 73);
+
+    m_btnCloseInteract = new Button(0, 0, 140, 40, "btn_generic", [this]() {
+        m_showInteractPopup = false;
+    }, 181, 73);
+
+    m_lblChallenge = new Text(0, 0, "assets/font.ttf", 20, "Challenge", {255,255,255,255});
+    m_btnChallenge = new Button(0, 0, 300, 60, "btn_generic", [this]() {
+         std::cout << "[Dashboard] Challenging " << m_targetPlayerName << std::endl;
+         Game::getInstance()->getClientSocket()->SendChallengeUser(m_targetPlayerName);
+         
+         m_showInteractPopup = false;
+         m_showWaitingResponse = true; // Show waiting popup
+         m_lblWaitingResponse->setText("Waiting for " + m_targetPlayerName + "...");
+         m_lblCancelWaiting->setText("Cancel");
+    }, 181, 73);
+
+    // --- INCOMING CHALLENGE POPUP ---
+    m_lblIncomingTitle = new Text(0,0, "assets/font.ttf", 28, "CHALLENGE!", {255,50,50,255});
+    m_lblIncomingMsg = new Text(0,0, "assets/font.ttf", 18, "Msg", {255,255,255,255});
+    m_lblIncomingAccept = new Text(0,0, "assets/font.ttf", 20, "Accept", {255,255,255,255});
+    m_lblIncomingDecline = new Text(0,0, "assets/font.ttf", 20, "Decline", {255,255,255,255});
+    
+    m_btnIncomingAccept = new Button(0,0, 140, 48, "btn_generic", [this]() {
+         // Send Accept
+         Game::getInstance()->getClientSocket()->SendChallengeResponse(true, m_incomingChallengerName);
+         m_showIncomingChallenge = false;
+         // Show waiting final popup
+         m_showWaitingFinal = true;
+         m_waitingFinalCanClose = false; 
+         m_lblWaitingFinal->setText("Waiting for host to start...");
+         m_waitingFinalStartTime = SDL_GetTicks(); // Start timer
+    }, 181, 73);
+
+    m_btnIncomingDecline = new Button(0,0, 140, 48, "btn_generic", [this]() {
+         // Send Decline
+         Game::getInstance()->getClientSocket()->SendChallengeResponse(false, m_incomingChallengerName);
+         m_showIncomingChallenge = false;
+    }, 181, 73);
+
+    // --- FINAL CONFIRM POPUP ---
+    m_lblFinalTitle = new Text(0,0, "assets/font.ttf", 28, "MATCH READY!", {50,255,50,255});
+    m_lblFinalMsg = new Text(0,0, "assets/font.ttf", 18, "Msg", {255,255,255,255});
+    m_lblFinalYes = new Text(0,0, "assets/font.ttf", 20, "Start!", {255,255,255,255});
+    m_lblFinalNo = new Text(0,0, "assets/font.ttf", 20, "Cancel", {255,255,255,255});
+
+    m_btnFinalYes = new Button(0,0, 140, 48, "btn_generic", [this]() {
+         // Send Final Confirm = Yes
+         Game::getInstance()->getClientSocket()->SendChallengeFinalConfirm(true, m_finalOpponentName);
+         // Wait for INIT_GAME (will be handled in packet loop)
+         m_lblFinalMsg->setText("Starting...");
+    }, 181, 73);
+
+    m_btnFinalNo = new Button(0,0, 140, 48, "btn_generic", [this]() {
+         // Send Final Confirm = No
+         Game::getInstance()->getClientSocket()->SendChallengeFinalConfirm(false, m_finalOpponentName);
+         m_showFinalConfirm = false;
+    }, 181, 73);
+
+    // --- WAITING RESPONSE POPUP ---
+    m_lblWaitingResponse = new Text(0,0, "assets/font.ttf", 20, "Waiting for response...", {255,255,255,255});
+    m_lblCancelWaiting = new Text(0,0, "assets/font.ttf", 18, "Cancel", {255,255,255,255});
+    m_btnCancelWaiting = new Button(0,0, 140, 48, "btn_generic", [this]() {            
+        // Just close the popup. 
+        // If response comes later, it will likely be ignored or show Final Popup which is fine.
+        m_showWaitingResponse = false;
+    }, 181, 73); 
+
+    // --- WAITING FINAL POPUP (Player B) ---
+    m_lblWaitingFinal = new Text(0,0, "assets/font.ttf", 20, "Waiting for host...", {255,255,255,255});
+    m_lblCloseWaitingFinal = new Text(0,0,"assets/font.ttf", 18, "Close", {255,255,255,255});
+    m_btnCloseWaitingFinal = new Button(0,0, 140, 48, "btn_generic", [this]() {
+         m_showWaitingFinal = false;
     }, 181, 73);
 
     // Initial Refresh
@@ -266,12 +333,12 @@ bool SceneDashboard::onEnter() {
 }
 
 void SceneDashboard::refreshPlayerList() {
-    // 1. Clear old texts
-    for (auto t : m_playerListTexts) {
-        t->clean(); // If Text had resources
-        delete t;
+    // 1. Clear old UI
+    for (auto& entry : m_playerListUI) {
+        if (entry.label) { entry.label->clean(); delete entry.label; }
+        if (entry.clickArea) { entry.clickArea->clean(); delete entry.clickArea; }
     }
-    m_playerListTexts.clear();
+    m_playerListUI.clear();
 
     // 2. Fetch new list
     m_allPlayers = Game::getInstance()->getClientSocket()->GetUserList();
@@ -282,7 +349,7 @@ void SceneDashboard::refreshPlayerList() {
     const int panelW = 360;
     const int panelX = screenW - outerMargin - panelW;
     const int startY = 110;
-    const int gap = 34;
+    const int gap = 44; // Increased gap for buttons
 
     int drawCount = 0;
 
@@ -293,27 +360,43 @@ void SceneDashboard::refreshPlayerList() {
 
         SDL_Color color = {200, 200, 200, 255};
         
-        std::string entry = std::string(m_allPlayers[i].username) + " (" + std::to_string(m_allPlayers[i].elo) + ")";
+        std::string entryName = m_allPlayers[i].username;
+        std::string displayStr = entryName + " (" + std::to_string(m_allPlayers[i].elo) + ")";
         
-        Text* t = new Text(0, 0, "assets/font.ttf", 18, entry, color);
-        const int y = startY + (drawCount * gap);
-        const int x = panelX + (panelW - t->getWidth()) / 2;
-        t->setPosition((float)x, (float)y);
-        m_playerListTexts.push_back(t);
+        // Create Button for the entire row
+        int y = startY + (drawCount * gap);
+        // Invisible button over the text Area
+        Button* btn = new Button(panelX + 10, y, panelW - 20, 40, "btn_generic", [this, entryName]() {
+            // Open Interaction Popup
+            std::cout << "Clicked on player: " << entryName << std::endl;
+            m_targetPlayerName = entryName;
+            m_showInteractPopup = true;
+            
+        }, 181, 73); 
+        // Note: using btn_generic but maybe we want a transparent one?  
+        // For now, let's assume we render text on top.
+
+        Text* t = new Text(0, 0, "assets/font.ttf", 18, displayStr, color);
+        // Center text in button
+        btn->centerObject(t);
+
+        PlayerEntry pe;
+        pe.label = t;
+        pe.clickArea = btn;
+        m_playerListUI.push_back(pe);
+        
         drawCount++;
     }
 }
 
 void SceneDashboard::update() {
-    // Check Matchmaking Notifications
+    // Check Matchmaking & Challenge Notifications
     Packet packet;
     if (Game::getInstance()->getClientSocket()->CheckNotifications(packet)) {
         if (packet.header.type == PacketType::RES_MATCH_FIND) {
              std::cout << "[Dashboard] Search Pending Confirmed by Server." << std::endl;
              m_isSearching = true;
              m_searchStartTime = SDL_GetTicks();
-             // Prevent the click used to press FIND MATCH from immediately
-             // triggering the CANCEL button (it appears in the same position).
              InputHandler::getInstance()->reset();
         }
         else if (packet.header.type == PacketType::REQ_MATCH_DECIDE_1) {
@@ -323,16 +406,56 @@ void SceneDashboard::update() {
             m_isSearching = false;
             m_showMatchPopup = true;
             m_hasMatchDecision = false;
-            // If the popup appears while the user is still holding a mouse button,
-            // avoid auto-clicking Accept/Decline.
             InputHandler::getInstance()->reset();
         }
         else if (packet.header.type == PacketType::RES_MATCH_DECIDE_2) {
-             std::cout << "[Dashboard] Match Confirmed! Starting Game..." << std::endl;
-             // TODO: Transition to SceneGame
-             // ResMatchDecide2 has playerOrder info
+             std::cout << "[Dashboard] Match Confirmed! Waiting for INIT_GAME..." << std::endl;
         }
-           else if (packet.header.type == PacketType::INIT_GAME) {
+        // --- CHALLENGE SYSTEM HANDLERS ---
+        else if (packet.header.type == PacketType::REQ_CHALLENGE_REQUEST) {
+            ReqChallengeRequest req = packet.GetPayload<ReqChallengeRequest>();
+            std::cout << "[Dashboard] Incoming Challenge from " << req.challengerUsername << std::endl;
+            m_incomingChallengerName = req.challengerUsername;
+            m_showIncomingChallenge = true;
+            m_showInteractPopup = false; 
+        }
+        else if (packet.header.type == PacketType::REQ_CHALLENGE_FINAL_CONFIRM) {
+            ReqChallengeFinalConfirm req = packet.GetPayload<ReqChallengeFinalConfirm>();
+            std::cout << "[Dashboard] Final Confirm from " << req.opponentUsername << std::endl;
+            
+            // Fix Issue: Check if we are still waiting (User might have cancelled)
+            if (!m_showWaitingResponse) {
+                std::cout << "[Dashboard] Received Final Confirm but not waiting (Cancelled?). Auto-Declining." << std::endl;
+                // Auto-decline to notify server/opponent
+                Game::getInstance()->getClientSocket()->SendChallengeFinalConfirm(false, req.opponentUsername);
+                return;
+            }
+
+            m_finalOpponentName = req.opponentUsername;
+            m_showWaitingResponse = false; // Stop waiting
+            m_showFinalConfirm = true;
+            m_showInteractPopup = false;
+        }
+        else if (packet.header.type == PacketType::RES_CHALLENGE_DECLINED) {
+             ResChallengeDeclined res = packet.GetPayload<ResChallengeDeclined>();
+             std::cout << "[Dashboard] Challenge Declined: " << res.reason << std::endl;
+             
+             // Update waiting popup if visible (User A)
+             if (m_showWaitingResponse) {
+                m_lblWaitingResponse->setText(std::string("Declined: ") + res.reason);
+                m_lblCancelWaiting->setText("Close");
+             } 
+             // Update waiting final popup if visible (User B)
+             else if (m_showWaitingFinal) {
+                 m_lblWaitingFinal->setText(std::string("Error: ") + res.reason);
+                 m_waitingFinalCanClose = true;
+             }
+             else {
+                 m_showFinalConfirm = false;
+             }
+        }
+        
+        else if (packet.header.type == PacketType::INIT_GAME) {
               InitGame init = packet.GetPayload<InitGame>();
 
               std::string host = init.host;
@@ -352,18 +475,72 @@ void SceneDashboard::update() {
 
                   const uint32_t myUserId = Game::getInstance()->getClientSocket()->GetUserId();
 
-                  // Run gameplay inside this process so we can return to Dashboard after the match.
-                  Game::getInstance()->getStateMachine()->pushState(new SceneGame(host, port, mapPath, m_username, init.matchId, myUserId));
+                  // Run gameplay
+                  // NOTE: allowSpectator=false to prevent accidental connection to Replay Server (zombie port)
+                  Game::getInstance()->getStateMachine()->pushState(new SceneGame(host, port, mapPath, m_username, init.matchId, myUserId, false));
+              
+              // Close all popups & Reset Flags
               m_showMatchPopup = false;
               m_hasMatchDecision = false;
+              m_showInteractPopup = false;
+              m_showWaitingResponse = false;
+              m_showIncomingChallenge = false;
+              m_showFinalConfirm = false;
+              m_showWaitingFinal = false; // Reset for B
+              m_showReplayPopup = false;
               return;
-           }
+        }
         else if (packet.header.type == PacketType::RES_MATCH_CANCEL) {
              m_isSearching = false;
              m_showMatchPopup = false; 
              m_hasMatchDecision = false;
-             std::cout << "[Dashboard] Match cancelled (Opponent declined or You cancelled)." << std::endl;
+             std::cout << "[Dashboard] Match cancelled." << std::endl;
         }
+    }
+
+    // Modal Popups Checking (Block interactions below if visible)
+
+    if (m_showWaitingResponse) {
+        if (m_btnCancelWaiting) m_btnCancelWaiting->update();
+        return;
+    }
+
+    if (m_showWaitingFinal) {
+        // Check timeout (10 seconds)
+        if (!m_waitingFinalCanClose && SDL_GetTicks() - m_waitingFinalStartTime > 10000) {
+             std::cout << "[Dashboard] Waiting for host timed out. Cancelling..." << std::endl;
+             // Send cancellation to server.
+             // We use SendChallengeResponse(false) to trigger Decline logic on server side
+             // This notifies Challenger (A) that we declined/cancelled.
+             Game::getInstance()->getClientSocket()->SendChallengeResponse(false, m_incomingChallengerName);
+             
+             m_lblWaitingFinal->setText("Error: Host timed out.");
+             m_waitingFinalCanClose = true;
+        }
+
+        if (m_waitingFinalCanClose && m_btnCloseWaitingFinal) {
+             m_btnCloseWaitingFinal->update();
+        }
+        return;
+    }
+
+    if (m_showInteractPopup) {
+        if (m_btnViewOtherProfile) m_btnViewOtherProfile->update();
+        if (m_btnChallenge) m_btnChallenge->update();
+        if (m_btnCloseInteract) m_btnCloseInteract->update();
+        return;
+    }
+
+    if (m_showIncomingChallenge) {
+        if (m_btnIncomingAccept) m_btnIncomingAccept->update();
+        if (m_btnIncomingDecline) m_btnIncomingDecline->update();
+        return;
+    }
+
+    if (m_showFinalConfirm) {
+        if (m_btnFinalYes) m_btnFinalYes->update();
+        if (m_btnFinalNo) m_btnFinalNo->update();
+        return;
     }
 
     if (m_showMatchPopup) {
@@ -371,7 +548,6 @@ void SceneDashboard::update() {
             m_btnAccept->update();
             m_btnDecline->update();
          }
-         // Block other updates
          return;
     }
 
@@ -406,11 +582,12 @@ void SceneDashboard::update() {
         obj->update();
     }
     
-    // Update dynamic player texts
-    for (auto t : m_playerListTexts) {
-        t->update();
+    // Update dynamic player list (Buttons + Labels)
+    for (auto& entry : m_playerListUI) {
+        if (entry.clickArea) entry.clickArea->update();
+        // Labels usually don't need update unless animating, but good practice
+        // if (entry.label) entry.label->update(); 
     }
-
 }
 
 void SceneDashboard::drawMatchPopup() {
@@ -451,8 +628,10 @@ void SceneDashboard::drawSidebar() {
     TextureManager::getInstance()->drawFillRect(sidebarX, sidebarY, sidebarW, sidebarH, 0, 0, 0, 140, renderer);
     
     // Draw Player List (Dynamic)
-    for (auto t : m_playerListTexts) {
-        t->draw();
+    for (auto& entry : m_playerListUI) {
+        if (entry.label) entry.label->draw();
+        // Don't need to draw invisible buttons unless debugging
+        // if (entry.clickArea) entry.clickArea->draw(); 
     }
 }
 
@@ -472,23 +651,22 @@ void SceneDashboard::render() {
     if (m_isSearching) {
          m_lblSearchingTimer->draw();
          m_btnCancelSearch->draw();
-         
-         // Should add a "Cancel" text label on top of button if button texture is generic
-         // For now, assume button texture has cancel? Or add label.
-         // Let's add a quick text label for Cancel
-            Text lblCancel(0, 0, "assets/font.ttf", 20, "CANCEL", {255,0,0,255});
-            m_btnCancelSearch->centerObject(&lblCancel);
+         Text lblCancel(0, 0, "assets/font.ttf", 20, "CANCEL", {255,0,0,255});
+         m_btnCancelSearch->centerObject(&lblCancel);
          lblCancel.draw();
     } else {
          m_btnFindMatch->draw();
-            m_btnFindMatch->centerObject(m_lblFindMatch);
+         m_btnFindMatch->centerObject(m_lblFindMatch);
          m_lblFindMatch->draw();
     }
 
-    // 4. Match Popup
+    // 4. Modal Popups (Render order matters: latest on top)
     drawMatchPopup();
-
-    // 5. Replay Popup
+    drawInteractionPopup();
+    drawIncomingChallengePopup();
+    drawWaitingResponsePopup();
+    drawFinalConfirmPopup();
+    drawWaitingFinalPopup();
     drawReplayPopup();
 }
 
@@ -537,42 +715,227 @@ void SceneDashboard::drawReplayPopup() {
     }
 }
 
+// showStatusMessage and drawStatusPopup Removed
+
+void SceneDashboard::drawInteractionPopup() {
+    if (!m_showInteractPopup) return;
+    SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+    int w, h;
+    SDL_GetRendererOutputSize(renderer, &w, &h);
+    
+    // Dim background
+    TextureManager::getInstance()->drawFillRect(0, 0, w, h, 0, 0, 0, 150, renderer);
+
+    // Popup Box
+    int boxW = 400;
+    int boxH = 380; // Increased height
+    int x = (w - boxW) / 2;
+    int y = (h - boxH) / 2;
+
+    TextureManager::getInstance()->drawFillRect(x, y, boxW, boxH, 30, 30, 30, 255, renderer);
+    TextureManager::getInstance()->drawFillRect(x, y, boxW, 2, 100, 200, 255, 255, renderer);
+
+    // Title: Player Name
+    Text title(0, 0, "assets/font.ttf", 32, m_targetPlayerName, {255, 255, 255, 255});
+    title.setPosition(x + (boxW - title.getWidth())/2, y + 30);
+    title.draw();
+
+    // Challenge Button
+    if (m_btnChallenge) {
+        m_btnChallenge->setPosition(x + 50, y + 100);
+        m_btnChallenge->draw();
+        m_btnChallenge->centerObject(m_lblChallenge);
+        m_lblChallenge->draw();
+    }
+
+    // View Profile Button
+    if (m_btnViewOtherProfile) {
+        m_btnViewOtherProfile->setPosition(x + 50, y + 100 + 70);
+        m_btnViewOtherProfile->draw();
+        m_btnViewOtherProfile->centerObject(m_lblViewOtherProfile);
+        m_lblViewOtherProfile->draw();
+    }
+    
+    // Close Button (Small 'X' or button at bottom)
+    if (m_btnCloseInteract) {
+        m_btnCloseInteract->setPosition(x + 130, y + 100 + 70 + 80);
+        m_btnCloseInteract->draw();
+        m_btnCloseInteract->centerObject(m_lblCloseInteract);
+        m_lblCloseInteract->draw();
+    }
+}
+
+void SceneDashboard::drawIncomingChallengePopup() {
+    if (!m_showIncomingChallenge) return;
+    SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+    int w, h;
+    SDL_GetRendererOutputSize(renderer, &w, &h);
+    TextureManager::getInstance()->drawFillRect(0, 0, w, h, 0, 0, 0, 180, renderer);
+
+    int boxW = 500, boxH = 300;
+    int x = (w - boxW)/2, y = (h - boxH)/2;
+    TextureManager::getInstance()->drawFillRect(x, y, boxW, boxH, 40, 20, 20, 255, renderer);
+    TextureManager::getInstance()->drawFillRect(x, y, boxW, 2, 255, 100, 100, 255, renderer);
+
+    if (m_lblIncomingTitle) {
+        m_lblIncomingTitle->setPosition((float)(x + (boxW - m_lblIncomingTitle->getWidth())/2), (float)(y + 30));
+        m_lblIncomingTitle->draw();
+    }
+
+    if (m_lblIncomingMsg) {
+        std::string msg = "Player " + m_incomingChallengerName + " challenges you!";
+        m_lblIncomingMsg->setText(msg);
+        m_lblIncomingMsg->setPosition((float)(x + (boxW - m_lblIncomingMsg->getWidth())/2), (float)(y + 80));
+        m_lblIncomingMsg->draw();
+    }
+
+    if (m_btnIncomingAccept) {
+        m_btnIncomingAccept->setPosition((float)(x + 60), (float)(y + 180));
+        m_btnIncomingAccept->draw();
+        m_btnIncomingAccept->centerObject(m_lblIncomingAccept);
+        m_lblIncomingAccept->draw();
+    }
+    
+    if (m_btnIncomingDecline) {
+        m_btnIncomingDecline->setPosition((float)(x + 300), (float)(y + 180));
+        m_btnIncomingDecline->draw();
+        m_btnIncomingDecline->centerObject(m_lblIncomingDecline);
+        m_lblIncomingDecline->draw();
+    }
+}
+
+void SceneDashboard::drawWaitingResponsePopup() {
+    if (!m_showWaitingResponse) return;
+    SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+    int w, h;
+    SDL_GetRendererOutputSize(renderer, &w, &h);
+    TextureManager::getInstance()->drawFillRect(0, 0, w, h, 0, 0, 0, 180, renderer);
+
+    int boxW = 500, boxH = 200; // Smaller box
+    int x = (w - boxW)/2, y = (h - boxH)/2;
+    TextureManager::getInstance()->drawFillRect(x, y, boxW, boxH, 20, 20, 40, 255, renderer);
+    TextureManager::getInstance()->drawFillRect(x, y, boxW, 2, 100, 100, 255, 255, renderer);
+
+    if (m_lblWaitingResponse) {
+        // Center text roughly
+        m_lblWaitingResponse->setPosition((float)(x + (boxW - m_lblWaitingResponse->getWidth())/2), (float)(y + 50));
+        m_lblWaitingResponse->draw();
+    }
+
+    if (m_btnCancelWaiting) {
+        m_btnCancelWaiting->setPosition((float)(x + (boxW - 140)/2), (float)(y + 120));
+        m_btnCancelWaiting->draw();
+        m_btnCancelWaiting->centerObject(m_lblCancelWaiting);
+        m_lblCancelWaiting->draw();
+    }
+}
+
+void SceneDashboard::drawWaitingFinalPopup() {
+    if (!m_showWaitingFinal) return;
+    SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+    int w, h;
+    SDL_GetRendererOutputSize(renderer, &w, &h);
+    TextureManager::getInstance()->drawFillRect(0, 0, w, h, 0, 0, 0, 180, renderer);
+
+    int boxW = 500, boxH = 200;
+    int x = (w - boxW)/2, y = (h - boxH)/2;
+    TextureManager::getInstance()->drawFillRect(x, y, boxW, boxH, 20, 20, 40, 255, renderer);
+    TextureManager::getInstance()->drawFillRect(x, y, boxW, 2, 100, 100, 255, 255, renderer);
+
+    if (m_lblWaitingFinal) {
+        // Center text roughly
+        m_lblWaitingFinal->setPosition((float)(x + (boxW - m_lblWaitingFinal->getWidth())/2), (float)(y + 50));
+        m_lblWaitingFinal->draw();
+    }
+
+    if (m_waitingFinalCanClose && m_btnCloseWaitingFinal) {
+        m_btnCloseWaitingFinal->setPosition((float)(x + (boxW - 140)/2), (float)(y + 120));
+        m_btnCloseWaitingFinal->draw();
+        m_btnCloseWaitingFinal->centerObject(m_lblCloseWaitingFinal);
+        m_lblCloseWaitingFinal->draw();
+    }
+}
+
+void SceneDashboard::drawFinalConfirmPopup() {
+    if (!m_showFinalConfirm) return;
+    SDL_Renderer* renderer = Game::getInstance()->getRenderer();
+    int w, h;
+    SDL_GetRendererOutputSize(renderer, &w, &h);
+    TextureManager::getInstance()->drawFillRect(0, 0, w, h, 0, 0, 0, 180, renderer);
+
+    int boxW = 500, boxH = 300;
+    int x = (w - boxW)/2, y = (h - boxH)/2;
+    TextureManager::getInstance()->drawFillRect(x, y, boxW, boxH, 20, 40, 20, 255, renderer);
+    TextureManager::getInstance()->drawFillRect(x, y, boxW, 2, 100, 255, 100, 255, renderer);
+
+    if (m_lblFinalTitle) {
+        m_lblFinalTitle->setPosition((float)(x + (boxW - m_lblFinalTitle->getWidth())/2), (float)(y + 30));
+        m_lblFinalTitle->draw();
+    }
+
+    if (m_lblFinalMsg) {
+        std::string msg = m_finalOpponentName + " accepted! Start game?";
+        m_lblFinalMsg->setText(msg);
+        m_lblFinalMsg->setPosition((float)(x + (boxW - m_lblFinalMsg->getWidth())/2), (float)(y + 80));
+        m_lblFinalMsg->draw();
+    }
+
+    if (m_btnFinalYes) {
+        m_btnFinalYes->setPosition((float)(x + 60), (float)(y + 180));
+        m_btnFinalYes->draw();
+        m_btnFinalYes->centerObject(m_lblFinalYes);
+        m_lblFinalYes->draw();
+    }
+
+    if (m_btnFinalNo) {
+        m_btnFinalNo->setPosition((float)(x + 300), (float)(y + 180));
+        m_btnFinalNo->draw();
+        m_btnFinalNo->centerObject(m_lblFinalNo);
+        m_lblFinalNo->draw();
+    }
+}
+
 bool SceneDashboard::onExit() {
+    // 1. Clean objects managed by m_uiObjects
     for (auto obj : m_uiObjects) {
         obj->clean();
         delete obj;
     }
     m_uiObjects.clear();
     
-    // Clean dynamic texts
-    for (auto t : m_playerListTexts) {
-        t->clean();
-        delete t;
+    // Nullify pointers that were in m_uiObjects to avoid accidental use
+    m_lblTitle = nullptr;
+    m_btnViewProfile = nullptr; 
+    m_lblViewProfile = nullptr;
+    m_btnReplay = nullptr; 
+    m_lblReplay = nullptr;
+    
+    // 2. Clean dynamic player list
+    for (auto& entry : m_playerListUI) {
+        if (entry.label) { entry.label->clean(); delete entry.label; }
+        if (entry.clickArea) { entry.clickArea->clean(); delete entry.clickArea; }
     }
-    m_playerListTexts.clear();
+    m_playerListUI.clear();
+
+    // 3. Clean Manually Managed Objects (NOT in m_uiObjects)
 
     // Match Popup cleanup
-    if (m_lblMatchFound) { m_lblMatchFound->clean(); delete m_lblMatchFound; }
-    if (m_lblMatchStatus) { m_lblMatchStatus->clean(); delete m_lblMatchStatus; }
-    if (m_btnAccept) { m_btnAccept->clean(); delete m_btnAccept; }
-    if (m_btnDecline) { m_btnDecline->clean(); delete m_btnDecline; }
-    if (m_lblAccept) { m_lblAccept->clean(); delete m_lblAccept; }
-    if (m_lblDecline) { m_lblDecline->clean(); delete m_lblDecline; }
+    if (m_lblMatchFound) { m_lblMatchFound->clean(); delete m_lblMatchFound; m_lblMatchFound=nullptr; }
+    if (m_lblMatchStatus) { m_lblMatchStatus->clean(); delete m_lblMatchStatus; m_lblMatchStatus=nullptr; }
+    if (m_btnAccept) { m_btnAccept->clean(); delete m_btnAccept; m_btnAccept=nullptr; }
+    if (m_btnDecline) { m_btnDecline->clean(); delete m_btnDecline; m_btnDecline=nullptr; }
+    if (m_lblAccept) { m_lblAccept->clean(); delete m_lblAccept; m_lblAccept=nullptr; }
+    if (m_lblDecline) { m_lblDecline->clean(); delete m_lblDecline; m_lblDecline=nullptr; }
 
     // Search UI cleanup
-    if (m_btnFindMatch) { m_btnFindMatch->clean(); delete m_btnFindMatch; }
-    if (m_lblFindMatch) { m_lblFindMatch->clean(); delete m_lblFindMatch; }
-    if (m_btnCancelSearch) { m_btnCancelSearch->clean(); delete m_btnCancelSearch; }
-    if (m_lblSearchingTimer) { m_lblSearchingTimer->clean(); delete m_lblSearchingTimer; }
+    if (m_btnFindMatch) { m_btnFindMatch->clean(); delete m_btnFindMatch; m_btnFindMatch=nullptr; }
+    if (m_lblFindMatch) { m_lblFindMatch->clean(); delete m_lblFindMatch; m_lblFindMatch=nullptr; }
+    if (m_btnCancelSearch) { m_btnCancelSearch->clean(); delete m_btnCancelSearch; m_btnCancelSearch=nullptr; }
+    if (m_lblSearchingTimer) { m_lblSearchingTimer->clean(); delete m_lblSearchingTimer; m_lblSearchingTimer=nullptr; }
 
-    // Header cleanup
-    if (m_lblTitle) { m_lblTitle->clean(); delete m_lblTitle; m_lblTitle = nullptr; }
-
-    // Replay button + popup cleanup
-    if (m_btnViewProfile) { m_btnViewProfile->clean(); delete m_btnViewProfile; m_btnViewProfile = nullptr; }
-    if (m_lblViewProfile) { m_lblViewProfile->clean(); delete m_lblViewProfile; m_lblViewProfile = nullptr; }
-    if (m_btnReplay) { m_btnReplay->clean(); delete m_btnReplay; m_btnReplay = nullptr; }
-    if (m_lblReplay) { m_lblReplay->clean(); delete m_lblReplay; m_lblReplay = nullptr; }
+    // Replay Popup (These were NOT added to m_uiObjects in onEnter, check?)
+    // In onEnter: m_lblReplayPopupTitle = new Text...
+    // They are NOT pushed to m_uiObjects. So we must delete them here.
     if (m_lblReplayPopupTitle) { m_lblReplayPopupTitle->clean(); delete m_lblReplayPopupTitle; m_lblReplayPopupTitle = nullptr; }
     if (m_lblReplayPopupHint) { m_lblReplayPopupHint->clean(); delete m_lblReplayPopupHint; m_lblReplayPopupHint = nullptr; }
     if (m_inReplayDir) { m_inReplayDir->clean(); delete m_inReplayDir; m_inReplayDir = nullptr; }
@@ -581,8 +944,41 @@ bool SceneDashboard::onExit() {
     if (m_btnReplayCancel) { m_btnReplayCancel->clean(); delete m_btnReplayCancel; m_btnReplayCancel = nullptr; }
     if (m_lblReplayCancel) { m_lblReplayCancel->clean(); delete m_lblReplayCancel; m_lblReplayCancel = nullptr; }
 
-    // Replay watch cleanup (if not already owned by m_uiObjects)
-    // Note: these were added to m_uiObjects, so they are already deleted above.
+    // Interaction Popup
+    if (m_lblViewOtherProfile) { m_lblViewOtherProfile->clean(); delete m_lblViewOtherProfile; m_lblViewOtherProfile=nullptr; }
+    if (m_btnViewOtherProfile) { m_btnViewOtherProfile->clean(); delete m_btnViewOtherProfile; m_btnViewOtherProfile=nullptr; }
+    if (m_lblCloseInteract) { m_lblCloseInteract->clean(); delete m_lblCloseInteract; m_lblCloseInteract=nullptr; }
+    if (m_btnCloseInteract) { m_btnCloseInteract->clean(); delete m_btnCloseInteract; m_btnCloseInteract=nullptr; }
+
+    // Challenge Popups Cleanup
+    if (m_lblChallenge) { m_lblChallenge->clean(); delete m_lblChallenge; m_lblChallenge=nullptr; }
+    if (m_btnChallenge) { m_btnChallenge->clean(); delete m_btnChallenge; m_btnChallenge=nullptr; }
     
+    // Incoming
+    if (m_lblIncomingTitle) { m_lblIncomingTitle->clean(); delete m_lblIncomingTitle; m_lblIncomingTitle=nullptr; }
+    if (m_lblIncomingMsg) { m_lblIncomingMsg->clean(); delete m_lblIncomingMsg; m_lblIncomingMsg=nullptr; }
+    if (m_btnIncomingAccept) { m_btnIncomingAccept->clean(); delete m_btnIncomingAccept; m_btnIncomingAccept=nullptr; }
+    if (m_lblIncomingAccept) { m_lblIncomingAccept->clean(); delete m_lblIncomingAccept; m_lblIncomingAccept=nullptr; }
+    if (m_btnIncomingDecline) { m_btnIncomingDecline->clean(); delete m_btnIncomingDecline; m_btnIncomingDecline=nullptr; }
+    if (m_lblIncomingDecline) { m_lblIncomingDecline->clean(); delete m_lblIncomingDecline; m_lblIncomingDecline=nullptr; }
+
+    // Final
+    if (m_lblFinalTitle) { m_lblFinalTitle->clean(); delete m_lblFinalTitle; m_lblFinalTitle=nullptr; }
+    if (m_lblFinalMsg) { m_lblFinalMsg->clean(); delete m_lblFinalMsg; m_lblFinalMsg=nullptr; }
+    if (m_btnFinalYes) { m_btnFinalYes->clean(); delete m_btnFinalYes; m_btnFinalYes=nullptr; }
+    if (m_lblFinalYes) { m_lblFinalYes->clean(); delete m_lblFinalYes; m_lblFinalYes=nullptr; }
+    if (m_btnFinalNo) { m_btnFinalNo->clean(); delete m_btnFinalNo; m_btnFinalNo=nullptr; }
+    if (m_lblFinalNo) { m_lblFinalNo->clean(); delete m_lblFinalNo; m_lblFinalNo=nullptr; }
+
+    // Waiting
+    if (m_lblWaitingResponse) { m_lblWaitingResponse->clean(); delete m_lblWaitingResponse; m_lblWaitingResponse=nullptr; }
+    if (m_btnCancelWaiting) { m_btnCancelWaiting->clean(); delete m_btnCancelWaiting; m_btnCancelWaiting=nullptr; }
+    if (m_lblCancelWaiting) { m_lblCancelWaiting->clean(); delete m_lblCancelWaiting; m_lblCancelWaiting=nullptr; }
+
+    // Waiting Final (B)
+    if (m_lblWaitingFinal) { m_lblWaitingFinal->clean(); delete m_lblWaitingFinal; m_lblWaitingFinal=nullptr; }
+    if (m_btnCloseWaitingFinal) { m_btnCloseWaitingFinal->clean(); delete m_btnCloseWaitingFinal; m_btnCloseWaitingFinal=nullptr; }
+    if (m_lblCloseWaitingFinal) { m_lblCloseWaitingFinal->clean(); delete m_lblCloseWaitingFinal; m_lblCloseWaitingFinal=nullptr; }
+
     return true;
 }

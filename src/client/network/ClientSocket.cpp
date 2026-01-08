@@ -170,11 +170,39 @@ bool ClientSocket::SendCancelMatch() {
     return true;
 }
 
-bool ClientSocket::SendGetProfile() {
+bool ClientSocket::SendGetProfile(std::string targetUsername) {
     if (!mIsConnected) return false;
     ReqGetProfile req;
     std::memset(&req, 0, sizeof(req));
-    // Server will use session username; still fill for completeness.
-    std::strncpy(req.username, mUsername.c_str(), sizeof(req.username) - 1);
+    
+    // If targetUsername is empty, use current user's username
+    std::string user = targetUsername.empty() ? mUsername : targetUsername;
+    std::strncpy(req.username, user.c_str(), sizeof(req.username) - 1);
+    
     return PacketUtils::SendPacket(mSocket, PacketType::REQ_GET_PROFILE, req);
+}
+
+bool ClientSocket::SendChallengeUser(const std::string& targetUsername) {
+    if (!mIsConnected) return false;
+    ReqChallengeUser req;
+    std::memset(&req, 0, sizeof(req));
+    std::strncpy(req.targetUsername, targetUsername.c_str(), sizeof(req.targetUsername) - 1);
+    return PacketUtils::SendPacket(mSocket, PacketType::REQ_CHALLENGE_USER, req);
+}
+
+bool ClientSocket::SendChallengeResponse(bool accept, const std::string& challenger) {
+    if (!mIsConnected) return false;
+    ResChallengeResponse res;
+    std::memset(&res, 0, sizeof(res));
+    res.accept = accept;
+    std::strncpy(res.challengerUsername, challenger.c_str(), sizeof(res.challengerUsername) - 1);
+    return PacketUtils::SendPacket(mSocket, PacketType::RES_CHALLENGE_RESPONSE, res);
+}
+
+bool ClientSocket::SendChallengeFinalConfirm(bool accept, const std::string& opponent) {
+    if (!mIsConnected) return false;
+    ResChallengeFinalConfirm res;
+    std::memset(&res, 0, sizeof(res));
+    res.accept = accept;
+    return PacketUtils::SendPacket(mSocket, PacketType::RES_CHALLENGE_FINAL_CONFIRM, res);
 }
