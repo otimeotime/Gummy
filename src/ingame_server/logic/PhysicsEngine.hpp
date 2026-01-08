@@ -11,6 +11,8 @@ struct Projectile {
     Position position;
     Velocity velocity;
     bool isActive;
+    bool isPowerUp;
+    int damage;
 };
 
 class PhysicsEngine {
@@ -135,7 +137,8 @@ public:
                     if (checkCollision(proj, p)) {
                         std::cerr << "Player " << p->getId() << " took damage" << std::endl;
                         proj.isActive = false;
-                        p->takeDamage(50); // Deal 50 damage on hit
+                        const int dmg = (proj.damage > 0) ? proj.damage : 15;
+                        p->takeDamage(dmg);
                         break;
                     }
                 }
@@ -150,9 +153,11 @@ public:
     }
             
     // Calculate initial velocity of projectile based on angle and player orientation
-    void fireProjectile(Player* p, std::vector<Projectile>& projectiles) {
+    void fireProjectile(Player* p, std::vector<Projectile>& projectiles, bool isPowerUp = false) {
         float rad = p->m_angle * (PI / 180.0f);
         Projectile proj;
+        proj.isPowerUp = isPowerUp;
+        proj.damage = isPowerUp ? 10 : 0;
         proj.position.x = p->m_position.x;
         proj.position.y = p->m_position.y - 20;
         float directionMult = p->m_position.orient ? 1.0f : -1.0f;

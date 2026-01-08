@@ -41,9 +41,17 @@ cleanup() {
 
   if [[ -n "${SERVER_PID:-}" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
     # Let the server handle SIGINT cleanly.
-    kill -INT "$SERVER_PID" 2>/dev/null
-    sleep 0.5
-    kill "$SERVER_PID" 2>/dev/null || true
+    kill -INT "$SERVER_PID" 2>/dev/null || true
+    # Wait briefly; if it doesn't exit, force kill.
+    for _ in {1..10}; do
+      if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+        break
+      fi
+      sleep 0.1
+    done
+    if kill -0 "$SERVER_PID" 2>/dev/null; then
+      kill "$SERVER_PID" 2>/dev/null || true
+    fi
   fi
 }
 trap cleanup EXIT INT TERM
@@ -55,29 +63,60 @@ if [[ ! -x "$SERVER_BIN" || ! -x "$CLIENT_BIN" ]]; then
 fi
 
 echo "Starting server on port $PORT (recording to $REPLAY_OUT)..."
-"$SERVER_BIN" --port "$PORT" --record "$REPLAY_OUT" >"$SERVER_LOG" 2>&1 &
+
+# If something is already listening on the desired port, it will cause a false-positive
+# readiness check and clients will connect to the wrong server. Try to stop it first.
+if command -v ss >/dev/null 2>&1; then
+  EXISTING_PIDS="$(ss -ltnpH "sport = :$PORT" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)"
+  if [[ -n "$EXISTING_PIDS" ]]; then
+    echo "Port $PORT is already in use by PID(s): $EXISTING_PIDS. Stopping them..."
+    for pid in $EXISTING_PIDS; do
+      kill -INT "$pid" 2>/dev/null || true
+    done
+    for _ in {1..30}; do
+      if ss -ltnH "sport = :$PORT" 2>/dev/null | grep -q ":$PORT"; then
+        sleep 0.1
+      else
+        break
+      fi
+    done
+  fi
+fi
+
+# Start server in a separate process group so terminal Ctrl+C doesn't also
+# send SIGINT directly to it (shutdown is handled by this script's trap).
+if command -v setsid >/dev/null 2>&1; then
+  setsid "$SERVER_BIN" --port "$PORT" --record "$REPLAY_OUT" >"$SERVER_LOG" 2>&1 &
+else
+  "$SERVER_BIN" --port "$PORT" --record "$REPLAY_OUT" >"$SERVER_LOG" 2>&1 &
+fi
 SERVER_PID=$!
 
-# Wait for TCP port to accept connections.
-# Uses bash's /dev/tcp; retries for up to ~5 seconds.
-echo -n "Waiting for server to accept connections"
-for _ in {1..50}; do
-  if (exec 3<>"/dev/tcp/$IP/$PORT") 2>/dev/null; then
-    exec 3>&-
-    exec 3<&-
+# Wait for server readiness.
+# IMPORTANT: do not just check LISTEN on the port, because an unrelated process
+# could be listening (including a leftover replay server), causing clients to
+# connect to the wrong server.
+echo -n "Waiting for server to start listening"
+for i in {1..80}; do
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    echo
+    echo "ERROR: server exited early. Last 60 lines of $SERVER_LOG:" >&2
+    tail -n 60 "$SERVER_LOG" >&2 || true
+    exit 1
+  fi
+
+  if grep -q "GameServer listening on port $PORT" "$SERVER_LOG" 2>/dev/null; then
     echo " OK"
     break
   fi
+
   echo -n "."
   sleep 0.1
-  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+
+  if [[ $i -eq 80 ]]; then
     echo
-    echo "ERROR: server exited early. Check $LOG_DIR/ingame_server_demo.log" >&2
-    exit 1
-  fi
-  if [[ $_ -eq 50 ]]; then
-    echo
-    echo "ERROR: timed out waiting for $IP:$PORT. Check $LOG_DIR/ingame_server_demo.log" >&2
+    echo "ERROR: timed out waiting for server readiness. Last 60 lines of $SERVER_LOG:" >&2
+    tail -n 60 "$SERVER_LOG" >&2 || true
     exit 1
   fi
 done

@@ -187,4 +187,8 @@ private:
     Text* m_lblSurrenderNo = nullptr;
 
     Text* m_lblSurrenderStatus = nullptr;
+
+    Button* m_btnPowerUp = nullptr;
+    std::string m_powerUpIconID;
+    bool m_powerUpArmed = false;
 };

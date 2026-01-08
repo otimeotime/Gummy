@@ -18,6 +18,7 @@ enum RoomState {
 
 class GameRoom {
 private:
+    bool m_powerUpNextShot[INGAME_MAX_PLAYERS]{false, false};
     std::vector<Player*> m_players;
     std::vector<Projectile> m_projectiles;
     PhysicsEngine* m_physics;
@@ -164,7 +165,13 @@ public:
         if (!m_physics || !m_mapLoader) return false;
 
         // Fire immediately; GameRoom owns the projectiles/physics.
-        m_physics->fireProjectile(shooter, m_projectiles);
+        const int shooterId = shooter->getId();
+        bool power = false;
+        if (shooterId >= 0 && shooterId < (int)INGAME_MAX_PLAYERS) {
+            power = m_powerUpNextShot[shooterId];
+            m_powerUpNextShot[shooterId] = false;
+        }
+        m_physics->fireProjectile(shooter, m_projectiles, power);
         shooter->m_power = 0.0f;
 
         m_state = FIRING_PHASE;
@@ -278,6 +285,10 @@ public:
                 currentPlayer->m_power = 0.0f;
             } else {
                 commitShot();
+            }
+        } else if (command == "POWER_UP") {
+            if (playerId >= 0 && playerId < (int)INGAME_MAX_PLAYERS) {
+                m_powerUpNextShot[playerId] = true;
             }
         }
     }

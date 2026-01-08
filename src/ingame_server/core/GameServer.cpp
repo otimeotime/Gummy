@@ -32,6 +32,8 @@ const char* CommandToString(uint32_t command) {
             return "ADJUST_POWER";
         case INGAME_CMD_FIRE:
             return "FIRE";
+        case INGAME_CMD_POWER_UP:
+            return "POWER_UP";
         default:
             return nullptr;
     }
@@ -79,6 +81,8 @@ void GameServer::BroadcastPauseSignal(uint32_t requesterId, uint32_t durationMs,
     std::lock_guard<std::mutex> lock(m_clientsMutex);
     for (auto* c : m_clients) {
         if (!c) continue;
+        // Only notify connections that have completed REQ_INGAME_JOIN.
+        if (m_fdToPlayerId.find(c->GetFd()) == m_fdToPlayerId.end()) continue;
         PacketUtils::SendPacket(c, PacketType::RES_INGAME_PAUSE_SIGNAL, sig);
     }
 }
@@ -91,6 +95,7 @@ void GameServer::BroadcastPauseEnd(uint32_t endedByPlayerId) {
     std::lock_guard<std::mutex> lock(m_clientsMutex);
     for (auto* c : m_clients) {
         if (!c) continue;
+        if (m_fdToPlayerId.find(c->GetFd()) == m_fdToPlayerId.end()) continue;
         PacketUtils::SendPacket(c, PacketType::RES_INGAME_PAUSE_END, msg);
     }
 }
@@ -104,6 +109,7 @@ void GameServer::BroadcastDrawSignal(uint32_t requesterId, uint32_t durationMs) 
     std::lock_guard<std::mutex> lock(m_clientsMutex);
     for (auto* c : m_clients) {
         if (!c) continue;
+        if (m_fdToPlayerId.find(c->GetFd()) == m_fdToPlayerId.end()) continue;
         PacketUtils::SendPacket(c, PacketType::RES_INGAME_DRAW_SIGNAL, sig);
     }
 }
@@ -122,6 +128,7 @@ void GameServer::BroadcastDrawResult(uint32_t requesterId, uint32_t responderId,
     std::lock_guard<std::mutex> lock(m_clientsMutex);
     for (auto* c : m_clients) {
         if (!c) continue;
+        if (m_fdToPlayerId.find(c->GetFd()) == m_fdToPlayerId.end()) continue;
         PacketUtils::SendPacket(c, PacketType::RES_INGAME_DRAW_RESULT, res);
     }
 }
@@ -140,7 +147,9 @@ void GameServer::BroadcastRematchStatus(uint8_t status, const char* message) {
 
     std::lock_guard<std::mutex> lock(m_clientsMutex);
     for (auto* c : m_clients) {
-        if (c) PacketUtils::SendPacket(c, PacketType::RES_INGAME_REMATCH_STATUS, res);
+        if (!c) continue;
+        if (m_fdToPlayerId.find(c->GetFd()) == m_fdToPlayerId.end()) continue;
+        PacketUtils::SendPacket(c, PacketType::RES_INGAME_REMATCH_STATUS, res);
     }
 }
 
@@ -345,6 +354,10 @@ void GameServer::HandleClient(TCPSocket* clientSocket) {
                 res.matchId = (req.matchId == 0) ? m_matchId : req.matchId;
                 res.playerId = UINT32_MAX;
 
+                bool handledReplayJoin = false;
+                ResReplayInfo replayInfo{};
+                std::memset(replayInfo.mapPath, 0, sizeof(replayInfo.mapPath));
+
                 uint32_t assignedPlayerId = UINT32_MAX;
                 {
                     std::lock_guard<std::mutex> lock(m_roomMutex);
@@ -355,14 +368,9 @@ void GameServer::HandleClient(TCPSocket* clientSocket) {
                         res.isSuccess = true;
                         res.playerId = UINT32_MAX;
                         std::snprintf(res.message, sizeof(res.message), "Joined replay match %u as spectator", res.matchId);
-                        PacketUtils::SendPacket(clientSocket, PacketType::RES_INGAME_JOIN, res);
-
-                        ResReplayInfo info{};
-                        std::memset(info.mapPath, 0, sizeof(info.mapPath));
                         const std::string mp = m_replayMapPath.empty() ? std::string(kDefaultMap) : m_replayMapPath;
-                        std::snprintf(info.mapPath, sizeof(info.mapPath), "%s", mp.c_str());
-                        PacketUtils::SendPacket(clientSocket, PacketType::RES_REPLAY_INFO, info);
-                        break;
+                        std::snprintf(replayInfo.mapPath, sizeof(replayInfo.mapPath), "%s", mp.c_str());
+                        handledReplayJoin = true;
                     }
 
                     // Simple restart support: if the previous match ended, reset server-side state
@@ -445,6 +453,18 @@ void GameServer::HandleClient(TCPSocket* clientSocket) {
                         m_matchHasStartTime = true;
                         m_matchSaved = false;
                     }
+                }
+
+                if (handledReplayJoin) {
+                    {
+                        std::lock_guard<std::mutex> lock(m_clientsMutex);
+                        // Mark spectators as joined so they can receive replay frames.
+                        m_fdToPlayerId[clientSocket->GetFd()] = UINT32_MAX;
+                    }
+
+                    PacketUtils::SendPacket(clientSocket, PacketType::RES_INGAME_JOIN, res);
+                    PacketUtils::SendPacket(clientSocket, PacketType::RES_REPLAY_INFO, replayInfo);
+                    break;
                 }
 
                 if (assignedPlayerId != UINT32_MAX) {
@@ -1102,6 +1122,7 @@ void GameServer::BroadcastStateSnapshot() {
                 snapshot.projectiles[i].y = pr.position.y;
                 snapshot.projectiles[i].vx = pr.velocity.vx;
                 snapshot.projectiles[i].vy = pr.velocity.vy;
+                snapshot.projectiles[i].isPowerUp = pr.isPowerUp ? 1 : 0;
             }
         }
     }
@@ -1109,6 +1130,8 @@ void GameServer::BroadcastStateSnapshot() {
     std::lock_guard<std::mutex> lock(m_clientsMutex);
     for (auto* c : m_clients) {
         if (!c) continue;
+        // Only send snapshots to clients that have completed REQ_INGAME_JOIN.
+        if (m_fdToPlayerId.find(c->GetFd()) == m_fdToPlayerId.end()) continue;
         PacketUtils::SendPacket(c, PacketType::RES_INGAME_STATE, snapshot);
     }
 
@@ -1121,6 +1144,7 @@ void GameServer::BroadcastReplayFrame(const ResIngameState& frame) {
     std::lock_guard<std::mutex> lock(m_clientsMutex);
     for (auto* c : m_clients) {
         if (!c) continue;
+        if (m_fdToPlayerId.find(c->GetFd()) == m_fdToPlayerId.end()) continue;
         PacketUtils::SendPacket(c, PacketType::RES_INGAME_STATE, frame);
     }
 }

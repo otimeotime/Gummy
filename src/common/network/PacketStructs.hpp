@@ -202,6 +202,7 @@ typedef enum {
     INGAME_CMD_ADJUST_ANGLE = 3,
     INGAME_CMD_ADJUST_POWER = 4,
     INGAME_CMD_FIRE = 5,
+    INGAME_CMD_POWER_UP = 6,
 } InGameCommand;
 
 #pragma pack(push, 1)
@@ -241,6 +242,7 @@ typedef struct {
 
 typedef struct {
     uint8_t isActive;
+    uint8_t isPowerUp;
     float x;
     float y;
     float vx;

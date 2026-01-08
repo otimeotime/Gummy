@@ -391,7 +391,10 @@ bool SceneGame::onEnter() {
     m_bgTextureID = "background";
     m_playerID = "player";
     m_bulletID = "bullet";
-
+    m_powerUpIconID = "power_up_icon";
+    if (!TextureManager::getInstance()->load("assets/power_up.png", m_powerUpIconID, Game::getInstance()->getRenderer())) {
+        std::cerr << "SceneGame: failed to load power-up icon" << std::endl;
+    }
     if (!TextureManager::getInstance()->load("assets/gameplay_background.png", m_bgTextureID, Game::getInstance()->getRenderer())) {
         std::cerr << "SceneGame: failed to load background" << std::endl;
         return false;
@@ -511,9 +514,12 @@ bool SceneGame::onExit() {
     DestroyDrawUI();
     DestroySurrenderUI();
 
+    if (m_btnPowerUp) { m_btnPowerUp->clean(); delete m_btnPowerUp; m_btnPowerUp = nullptr; }
+
     TextureManager::getInstance()->clearFromTextureMap(m_bgTextureID);
     TextureManager::getInstance()->clearFromTextureMap(m_playerID);
     TextureManager::getInstance()->clearFromTextureMap(m_bulletID);
+    TextureManager::getInstance()->clearFromTextureMap(m_powerUpIconID);
 
     return true;
 }
@@ -885,6 +891,28 @@ void SceneGame::update() {
         if (m_btnSurrender) m_btnSurrender->update();
     }
 
+    // Power-up button update (available anytime for live players, except paused/confirm overlays)
+    if (!pausedNow) {
+        if (!m_btnPowerUp) {
+            const int size = 48;
+            const int margin = 20;
+            const int x = 1280 - margin - size;
+            const int y = 720 / 2 - size / 2;
+            SDL_Color orange{255, 165, 0, 255};
+            m_btnPowerUp = new Button((float)x, (float)y, size, size, "btn_generic",
+                                      [this]() {
+                                          m_powerUpArmed = true;
+                                          SendInput(INGAME_CMD_POWER_UP);
+                                      },
+                                      181, 73, orange, 3);
+        }
+        // Toggle indicator via opacity: dim when OFF, bright when ARMED.
+        if (m_btnPowerUp) {
+            m_btnPowerUp->setAlpha(m_powerUpArmed ? 255 : 120);
+        }
+        if (m_btnPowerUp) m_btnPowerUp->update();
+    }
+
     // Pause UI label + enable state + positioning
     {
         std::lock_guard<std::mutex> lock(m_pauseMutex);
@@ -1078,6 +1106,8 @@ void SceneGame::update() {
     static bool wasEnterPressed = false;
     const bool isEnterPressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_RETURN);
     if (isEnterPressed && !wasEnterPressed) {
+        // Consume locally (server is authoritative, but this keeps the UI indicator correct).
+        m_powerUpArmed = false;
         SendInput(INGAME_CMD_FIRE);
     }
     wasEnterPressed = isEnterPressed;
@@ -1206,18 +1236,25 @@ void SceneGame::render() {
         const auto& pr = state.projectiles[i];
         if (!pr.isActive) continue;
 
-        // Prefer sprite if loaded; otherwise (or additionally) draw a small rect.
-        TextureManager::getInstance()->drawScaled(
-            m_bulletID,
-            (int)pr.x - 8,
-            (int)pr.y - 8,
-            16,
-            16,
-            Game::getInstance()->getRenderer());
+        // Power-up projectile: orange (not yellow).
+        if (pr.isPowerUp) {
+            SDL_Rect r{(int)pr.x - 8, (int)pr.y - 8, 16, 16};
+            SDL_SetRenderDrawColor(Game::getInstance()->getRenderer(), 255, 165, 0, 255);
+            SDL_RenderFillRect(Game::getInstance()->getRenderer(), &r);
+        } else {
+            // Normal projectile: sprite if loaded; otherwise a small white rect.
+            TextureManager::getInstance()->drawScaled(
+                m_bulletID,
+                (int)pr.x - 8,
+                (int)pr.y - 8,
+                16,
+                16,
+                Game::getInstance()->getRenderer());
 
-        SDL_Rect r{(int)pr.x - 2, (int)pr.y - 2, 4, 4};
-        SDL_SetRenderDrawColor(Game::getInstance()->getRenderer(), 255, 255, 255, 255);
-        SDL_RenderFillRect(Game::getInstance()->getRenderer(), &r);
+            SDL_Rect r{(int)pr.x - 2, (int)pr.y - 2, 4, 4};
+            SDL_SetRenderDrawColor(Game::getInstance()->getRenderer(), 255, 255, 255, 255);
+            SDL_RenderFillRect(Game::getInstance()->getRenderer(), &r);
+        }
     }
 
     // HUD: local-player-only indicators.
@@ -1499,13 +1536,31 @@ void SceneGame::render() {
     if (m_playerId != UINT32_MAX) {
         EnsureDrawUI();
         EnsureSurrenderUI();
-
         bool pausedNow = false;
         {
             std::lock_guard<std::mutex> lock(m_pauseMutex);
             pausedNow = m_pauseActive;
         }
         if (!pausedNow && !surrenderConfirm) {
+            // Power-up button: small square, right-center, orange stroke + icon.
+            const int size = 48;
+            const int puMargin = 20;
+            const int puX = 1280 - puMargin - size;
+            const int puY = 720 / 2 - size / 2;
+            const int pad = 6;
+
+            if (m_btnPowerUp) {
+                m_btnPowerUp->setPosition((float)puX, (float)puY);
+                m_btnPowerUp->draw();
+            }
+            TextureManager::getInstance()->drawScaled(
+                m_powerUpIconID,
+                puX + pad,
+                puY + pad,
+                size - 2 * pad,
+                size - 2 * pad,
+                renderer);
+
             bool drawPending = false;
             uint32_t requester = UINT32_MAX;
             {
@@ -1636,6 +1691,8 @@ void SceneGame::render() {
             }
             drawToastTopRight(m_lblSurrenderStatus, msg, until);
         }
+
+
     }
 }
 
