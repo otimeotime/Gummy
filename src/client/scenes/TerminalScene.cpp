@@ -38,9 +38,9 @@ TerminalScene::TerminalScene(std::string serverIp, int serverPort, std::string m
 bool TerminalScene::onEnter() {
     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
 
-    TextureManager::getInstance()->load("assets/gameplay_background.png", m_bgTextureID, renderer);
-    TextureManager::getInstance()->load("assets/button.png", m_restartBtnTextureID, renderer);
-    TextureManager::getInstance()->load("assets/button.png", m_homeBtnTextureID, renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("gameplay_background.png"), m_bgTextureID, renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), m_restartBtnTextureID, renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), m_homeBtnTextureID, renderer);
 
     m_title = new Text(0, 0, "assets/font.ttf", 64, "GAME OVER", {255, 255, 255, 255});
     m_title->setPosition((kScreenW - m_title->getWidth()) / 2.0f, (float)PanelY() + 30.0f);

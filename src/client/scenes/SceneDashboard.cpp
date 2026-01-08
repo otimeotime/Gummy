@@ -100,10 +100,10 @@ bool SceneDashboard::onEnter() {
 
     // 1. Load Resources
     m_bgTextureID = "lobby_bg";
-    if (!TextureManager::getInstance()->load("assets/gameplay_background.png", m_bgTextureID, renderer)) {
+    if (!TextureManager::getInstance()->load(TextureManager::spritePath("gameplay_background.png"), m_bgTextureID, renderer)) {
         // Fallback or just log
     }
-    TextureManager::getInstance()->load("assets/button.png", "btn_generic", renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), "btn_generic", renderer);
 
     // 2. Layout Constants
     const int screenW = 1280;
@@ -137,15 +137,15 @@ bool SceneDashboard::onEnter() {
     const int actionBtnH = 64;
     const int actionGap = 16;
 
-                // "FIND MATCH" Button (primary action)
-                const int playBtnY = 220;
-                m_btnFindMatch = new Button(leftX, playBtnY, actionBtnW, actionBtnH, "btn_generic", [this]() {
+    // "FIND MATCH" Button (primary action)
+    const int playBtnY = 220;
+    m_btnFindMatch = new Button(leftX, playBtnY, actionBtnW, actionBtnH, "btn_generic", [this]() {
         std::cout << "[SceneDashboard] Sending Find Match Request..." << std::endl;
         if(Game::getInstance()->getClientSocket()->SendFindMatch()) {
-             std::cout << " > Request Sent. Waiting for server confirmation..." << std::endl;
-             // Do NOT start timer yet. Wait for RES_MATCH_FIND.
+                std::cout << " > Request Sent. Waiting for server confirmation..." << std::endl;
+                // Do NOT start timer yet. Wait for RES_MATCH_FIND.
         } else {
-             std::cout << " > Request Failed (Send Error)." << std::endl;
+                std::cout << " > Request Failed (Send Error)." << std::endl;
         }
     }, 181, 73);
     // m_uiObjects.push_back(m_btnFindMatch); // Managed manually

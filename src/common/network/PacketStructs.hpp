@@ -46,11 +46,11 @@ typedef struct {
     int dummy;
 } ReqGetUserList;
 
-struct PlayerStatusInfo {
+typedef struct {
     char username[32];
     bool isOnline;
     int elo;
-};
+} PlayerStatusInfo;
 
 typedef struct {
     int count;
@@ -132,33 +132,6 @@ typedef struct {
     char mapPath[128];   // e.g. "assets/maps/flatmap.txt"
 } InitGame;
 // --------------------------------------------------------
-// In Game Packets ---------------------------------------
-typedef struct {
-    bool orient;
-    float distance;
-    float angle;
-    float power;
-} ReqPlay;
-
-typedef struct {
-    bool isSuccess;
-    char message[100];
-} ResPlay;
-
-typedef struct {
-    // PlayerPos playerpos;
-    // PlauyerPos opponentpos;
-    // GameState gamestate;
-    bool isEnd;
-} ResExecutePlay;
-
-typedef struct {
-    uint32_t winner_id[32];
-    int winnerScore;
-    int loserScore;
-    int winnerEloGain;
-    int loserEloLoss;
-} GameResult;
 
 // Realtime Ingame Server Packets -------------------------
 // Keep these fixed-size for the current Packet (memcpy) serializer.

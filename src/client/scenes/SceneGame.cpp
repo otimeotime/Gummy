@@ -35,21 +35,21 @@ SceneGame::SceneGame(std::string serverIp, int serverPort, std::string mapPath, 
       m_serverPort(serverPort),
       m_running(false),
       m_socket(nullptr),
-    m_matchId(matchId == 0 ? 1u : matchId),
+      m_matchId(matchId == 0 ? 1u : matchId),
       m_playerId(UINT32_MAX),
-    m_userId(userId),
+      m_userId(userId),
       m_seq(0),
       m_hasState(false),
       m_bgTextureID(""),
       m_playerID(""),
-      m_bulletID(""),
-                                                m_mapPath(std::move(mapPath)),
-                                                m_username(std::move(username)),
-            m_mapLoader(nullptr),
-            m_mapTexture(nullptr),
-            m_mapModified(true),
-            m_font(nullptr),
-      m_lastTick(0) {
+    m_bulletID(""),
+    m_mapPath(std::move(mapPath)),
+    m_username(std::move(username)),
+    m_mapLoader(nullptr),
+    m_mapTexture(nullptr),
+    m_mapModified(true),
+    m_font(nullptr),
+    m_lastTick(0) {
     std::memset(&m_lastState, 0, sizeof(m_lastState));
     std::memset(&m_lastReplayStatus, 0, sizeof(m_lastReplayStatus));
 }
@@ -127,7 +127,7 @@ void SceneGame::EnsurePauseUI() {
     if (m_btnPause) return;
 
     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
-    TextureManager::getInstance()->load("assets/button.png", "btn_generic", renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), "btn_generic", renderer);
 
     const int btnW = 160;
     const int btnH = 45;
@@ -182,7 +182,7 @@ void SceneGame::EnsureDrawUI() {
     if (m_btnDraw) return;
 
     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
-    TextureManager::getInstance()->load("assets/button.png", "btn_generic", renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), "btn_generic", renderer);
 
     const int btnW = 160;
     const int btnH = 45;
@@ -231,7 +231,7 @@ void SceneGame::EnsureSurrenderUI() {
     if (m_btnSurrender) return;
 
     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
-    TextureManager::getInstance()->load("assets/button.png", "btn_generic", renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), "btn_generic", renderer);
 
     const int btnW = 160;
     const int btnH = 45;
@@ -307,7 +307,7 @@ void SceneGame::EnsureReplayUI() {
     if (m_btnReplayPlayPause) return;
 
     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
-    TextureManager::getInstance()->load("assets/button.png", "btn_generic", renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), "btn_generic", renderer);
 
     const int x0 = 30;
     const int y0 = 80;
@@ -391,15 +391,15 @@ bool SceneGame::onEnter() {
     m_playerID = "player";
     m_bulletID = "bullet";
 
-    if (!TextureManager::getInstance()->load("assets/gameplay_background.png", m_bgTextureID, Game::getInstance()->getRenderer())) {
+    if (!TextureManager::getInstance()->load(TextureManager::spritePath("gameplay_background.png"), m_bgTextureID, Game::getInstance()->getRenderer())) {
         std::cerr << "SceneGame: failed to load background" << std::endl;
         return false;
     }
-    if (!TextureManager::getInstance()->load("assets/player.png", m_playerID, Game::getInstance()->getRenderer())) {
+    if (!TextureManager::getInstance()->load(TextureManager::spritePath("player.png"), m_playerID, Game::getInstance()->getRenderer())) {
         std::cerr << "SceneGame: failed to load player texture" << std::endl;
         return false;
     }
-    if (!TextureManager::getInstance()->load("assets/bullet.png", m_bulletID, Game::getInstance()->getRenderer())) {
+    if (!TextureManager::getInstance()->load(TextureManager::spritePath("bullet.png"), m_bulletID, Game::getInstance()->getRenderer())) {
         std::cerr << "SceneGame: failed to load bullet texture" << std::endl;
         // Don't hard-fail: we can render projectiles as rectangles.
     }

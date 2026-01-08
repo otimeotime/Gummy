@@ -87,12 +87,12 @@ bool SceneLogin::onEnter() {
     // 1. SETUP RESOURCES
     // ---------------------------------------------------------
     m_bannerTextureID = "Mario";
-    if (!TextureManager::getInstance()->load("assets/Mario.png", m_bannerTextureID, Game::getInstance()->getRenderer())) {
+    if (!TextureManager::getInstance()->load(TextureManager::spritePath("Mario.png"), m_bannerTextureID, Game::getInstance()->getRenderer())) {
         std::cout << "[SceneLogin] Failed to load banner image!" << std::endl;
     }
 
-    if (!TextureManager::getInstance()->load("assets/button.png", "btn_login", renderer)) {
-         std::cout << "[SceneLogin] Failed to load Login Button!" << std::endl;
+    if (!TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), "btn_login", renderer)) {
+        std::cout << "[SceneLogin] Failed to load Login Button!" << std::endl;
     }
 
     // ---------------------------------------------------------

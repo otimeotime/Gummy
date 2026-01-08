@@ -45,6 +45,10 @@ GameServer::GameServer()
       m_matchId(1),
       m_tick(0) {}
 
+GameServer::~GameServer() {
+    Stop();
+}
+
 void GameServer::SetMatchId(uint32_t matchId) {
     if (matchId == 0) return;
     std::lock_guard<std::mutex> lock(m_roomMutex);
@@ -142,10 +146,6 @@ void GameServer::BroadcastRematchStatus(uint8_t status, const char* message) {
     for (auto* c : m_clients) {
         if (c) PacketUtils::SendPacket(c, PacketType::RES_INGAME_REMATCH_STATUS, res);
     }
-}
-
-GameServer::~GameServer() {
-    Stop();
 }
 
 void GameServer::EnableRecording(const std::string& path) {
