@@ -91,8 +91,8 @@ bool SceneLogin::onEnter() {
         std::cout << "[SceneLogin] Failed to load banner image!" << std::endl;
     }
 
-    if (!TextureManager::getInstance()->load("assets/button.png", "btn_login", renderer)) {
-         std::cout << "[SceneLogin] Failed to load Login Button!" << std::endl;
+    if (!TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), "btn_login", renderer)) {
+        std::cout << "[SceneLogin] Failed to load Login Button!" << std::endl;
     }
 
     // ---------------------------------------------------------

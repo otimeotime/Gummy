@@ -73,8 +73,8 @@ bool SceneViewProfile::onEnter() {
     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
 
     // Background is just the existing gameplay bg for now (consistent with dashboard)
-    TextureManager::getInstance()->load("assets/gameplay_background.png", "profile_bg", renderer);
-    TextureManager::getInstance()->load("assets/button.png", "btn_generic", renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("gameplay_background.png"), "profile_bg", renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), "btn_generic", renderer);
 
     // Back button top-left: "< BACK"
     m_btnBack = new Button(40, 30, 140, 44, "btn_generic", [this]() {

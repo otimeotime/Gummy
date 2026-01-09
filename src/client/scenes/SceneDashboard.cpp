@@ -100,10 +100,10 @@ bool SceneDashboard::onEnter() {
 
     // 1. Load Resources
     m_bgTextureID = "lobby_bg";
-    if (!TextureManager::getInstance()->load("assets/gameplay_background.png", m_bgTextureID, renderer)) {
+    if (!TextureManager::getInstance()->load(TextureManager::spritePath("gameplay_background.png"), m_bgTextureID, renderer)) {
         // Fallback or just log
     }
-    TextureManager::getInstance()->load("assets/button.png", "btn_generic", renderer);
+    TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), "btn_generic", renderer);
 
     // 2. Layout Constants
     const int screenW = 1280;
@@ -140,7 +140,7 @@ bool SceneDashboard::onEnter() {
         if(Game::getInstance()->getClientSocket()->SendFindMatch()) {
              std::cout << " > Request Sent. Waiting for server confirmation..." << std::endl;
         } else {
-             std::cout << " > Request Failed (Send Error)." << std::endl;
+                std::cout << " > Request Failed (Send Error)." << std::endl;
         }
     }, 181, 73);
 

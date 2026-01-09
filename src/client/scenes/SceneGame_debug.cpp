@@ -19,7 +19,7 @@ bool SceneGame::onEnter() {
     // 1. Load Background
     m_bgTextureID = "game_bg";
     // Using a fallback color if image fails? No, let's just stick to the map debug.
-    TextureManager::getInstance()->load("assets/gameplay_background.png", m_bgTextureID, Game::getInstance()->getRenderer());
+    TextureManager::getInstance()->load(TextureManager::spritePath("gameplay_background.png"), m_bgTextureID, Game::getInstance()->getRenderer());
 
     // 2. Initialize MapLoader
     m_mapLoader = new MapLoader();

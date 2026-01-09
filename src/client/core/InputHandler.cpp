@@ -3,11 +3,8 @@
 InputHandler::InputHandler() {
     mousePosition = new Vector2D();
     // Initialize mouse buttons (Left, Middle, Right)
-    for(int i = 0; i < 3; i++) {
-        mouseButtonStates.push_back(false);
-        mouseButtonJustPressed.push_back(false);
-    }
-
+    mouseButtonStates.assign(3, false);
+    mouseButtonJustPressed.assign(3, false);
     m_inputText = "";
     m_isBackspace = false;
 }
@@ -19,15 +16,8 @@ InputHandler::~InputHandler() {
 void InputHandler::update() {
     // Update Keyboard state array
     keystates = SDL_GetKeyboardState(0);
-    // Reset enter string per frame
     m_inputText = "";
-    
-    // Reset click states
-    for(int i = 0; i < 3; i++) {
-        mouseButtonJustPressed[i] = false;
-    }
-
-    // Reset mouse wheel delta per frame
+    mouseButtonJustPressed.assign(3, false);
     m_mouseWheelY = 0;
 }
 

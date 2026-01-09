@@ -5,6 +5,13 @@
 
 class TextureManager {
 public:
+    static constexpr const char* kSpritesDir = "assets/sprites/";
+
+    // Helper to build the canonical path for any sprite image.
+    static std::string spritePath(const std::string& fileName) {
+        return std::string(kSpritesDir) + fileName;
+    }
+
     // Singleton access
     static TextureManager* getInstance() {
         static TextureManager instance;

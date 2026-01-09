@@ -64,11 +64,11 @@ bool SceneRegister::onEnter() {
     // but here we just call load. If it's already there, it might reload or just work. 
     // TextureManager::load doesn't check existence, it overwrites. 
     // Ideally we check, but for now let's just load to be safe or assume SceneLogin loaded it.)
-    if (!TextureManager::getInstance()->load("assets/Mario.png", m_bannerTextureID, renderer)) {
+        if (!TextureManager::getInstance()->load(TextureManager::spritePath("Mario.png"), m_bannerTextureID, renderer)) {
         std::cout << "[SceneRegister] Failed to load banner!" << std::endl;
     }
     
-    if (!TextureManager::getInstance()->load("assets/button.png", "btn_register", renderer)) {
+        if (!TextureManager::getInstance()->load(TextureManager::spritePath("button.png"), "btn_register", renderer)) {
          std::cout << "[SceneRegister] Failed to load Register Button!" << std::endl;
     }
 
