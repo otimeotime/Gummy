@@ -852,6 +852,9 @@ void SceneGame::ReceiverLoop() {
         ResIngameState s = p.GetPayload<ResIngameState>();
         {
             std::lock_guard<std::mutex> lock(m_stateMutex);
+            if (s.hasExplosion) {
+                m_pendingExplosions.push_back({s.explosionX, s.explosionY, s.explosionRadius});
+            }
             m_lastState = s;
             m_hasState = true;
         }
@@ -1299,12 +1302,16 @@ void SceneGame::render() {
 
         ResIngameState state{};
         bool hasState = false;
+        std::vector<ExplosionEvent> explosionsToApply;
+
         {
             std::lock_guard<std::mutex> lock(m_stateMutex);
             if (m_hasState) {
                 state = m_lastState;
                 hasState = true;
             }
+            explosionsToApply = std::move(m_pendingExplosions);
+            m_pendingExplosions.clear(); 
         }
 
         if (!hasState) {
@@ -1325,11 +1332,19 @@ void SceneGame::render() {
         }
 
         // Apply explosion events from server to our local terrain.
-        if (state.hasExplosion && m_mapLoader) {
-            m_mapLoader->applyExplosion(state.explosionX, state.explosionY, state.explosionRadius);
+        if (!explosionsToApply.empty() && m_mapLoader) {
+            for (const auto& ex : explosionsToApply) {
+                m_mapLoader->applyExplosion(ex.x, ex.y, ex.radius);
+            }
             m_mapModified = true;
         }
-
+        // Fallback for replay (which might still rely on single-state hasExplosion if not using queue logic perfectly)
+        // or just double safety: if state says explosion but queue missed it (unlikely with above logic), apply it?
+        // Actually, with Replay, we might need check. In Replay Mode, ReceiverLoop isn't running the same way if read from file?
+        // Wait, Replay is usually handled via server connection in this codebase (SceneGame connects to server in Replay Mode too).
+        // BUT if this is a "live" replay or the server is just streaming states.
+        // Let's stick to queue. It is populated in ReceiverLoop which handles ALL incoming packets.
+        
         if (m_mapModified) {
             updateMapTexture();
             m_mapModified = false;

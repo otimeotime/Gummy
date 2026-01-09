@@ -90,6 +90,11 @@ private:
     std::mutex m_stateMutex;
     ResIngameState m_lastState;
     bool m_hasState;
+    
+    struct ExplosionEvent {
+        float x, y, radius;
+    };
+    std::vector<ExplosionEvent> m_pendingExplosions;
 
     std::string m_bgTextureID;
     std::string m_playerID;

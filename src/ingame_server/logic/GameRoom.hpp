@@ -231,10 +231,20 @@ public:
             m_physics->update(physicsDt, m_players, m_projectiles, m_mapLoader);
         }
 
+        // Check constantly for win conditions (e.g. death by falling)
+        checkWinCondition();
+        if (m_state == GAME_OVER) return;
+
         if (m_state == PLAYING_TURN) {
+            Player* currentPlayer = getCurrentPlayer();
+            // If the current player died (e.g. fell off map), end turn immediately.
+            if (currentPlayer && !currentPlayer->isAlive()) {
+                switchTurn();
+                return;
+            }
+
             m_turnTimer -= deltaTime;
             if (m_turnTimer <= 0.0f) {
-                Player* currentPlayer = getCurrentPlayer();
                 if (!currentPlayer || !currentPlayer->isAlive()) {
                     switchTurn();
                 } else if (currentPlayer->m_power < 1.0f) {

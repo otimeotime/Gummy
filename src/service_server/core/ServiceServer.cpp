@@ -15,6 +15,9 @@
 #include <unistd.h>
 #include <ctime>
 #include <sys/stat.h>
+#include <filesystem>
+#include <vector>
+#include <random>
 
 namespace {
 std::string GetEnvOrDefault(const char* key, const std::string& def) {
@@ -72,6 +75,28 @@ bool IsTcpListeningOnce(const std::string& host, int port) {
     int rc = ::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
     ::close(fd);
     return rc == 0;
+}
+
+std::string GetRandomMapFromAssets() {
+    namespace fs = std::filesystem;
+    std::vector<std::string> maps;
+    const std::string mapsDir = "assets/maps";
+    try {
+        if (fs::exists(mapsDir) && fs::is_directory(mapsDir)) {
+            for (const auto& entry : fs::directory_iterator(mapsDir)) {
+                 if (entry.path().extension() == ".txt") {
+                     maps.push_back(entry.path().string());
+                 }
+            }
+        }
+    } catch (...) {}
+    
+    if (maps.empty()) return "assets/maps/flatmap.txt";
+    
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, maps.size() - 1);
+    return maps[dis(gen)];
 }
 
 int PickFreePort(const std::string& host, int preferredPort, int maxTries) {
@@ -546,7 +571,8 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
                         init.matchId = it->matchId;
                         std::strncpy(init.host, mIngameHost.c_str(), sizeof(init.host) - 1);
                         init.port = static_cast<uint16_t>(ingamePort);
-                        std::strncpy(init.mapPath, mIngameMapPath.c_str(), sizeof(init.mapPath) - 1);
+                        std::string rMap = GetRandomMapFromAssets();
+                        std::strncpy(init.mapPath, rMap.c_str(), sizeof(init.mapPath) - 1);
                         PacketUtils::SendPacket(it->socket1, PacketType::INIT_GAME, init);
                         PacketUtils::SendPacket(it->socket2, PacketType::INIT_GAME, init);
                         
@@ -733,7 +759,7 @@ void ServiceServer::HandleClient(TCPSocket* clientSocket) {
                             init.matchId = pm.matchId;
                             std::strncpy(init.host, mIngameHost.c_str(), sizeof(init.host));
                             init.port = portToUse;
-                            std::string mapPath = mIngameMapPath;
+                            std::string mapPath = GetRandomMapFromAssets();
                             std::strncpy(init.mapPath, mapPath.c_str(), sizeof(init.mapPath));
 
                             PacketUtils::SendPacket(pm.socket1, PacketType::INIT_GAME, init);

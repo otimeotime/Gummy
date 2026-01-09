@@ -440,8 +440,9 @@ void GameServer::HandleClient(TCPSocket* clientSocket) {
                     float sy = (spawns.size() > assignedPlayerId) ? spawns[assignedPlayerId].y : 100.0f;
                     bool orient = (assignedPlayerId % 2 == 0);
 
+                    std::string pName = (req.username[0] != '\0') ? std::string(req.username) : ("Player" + std::to_string(assignedPlayerId + 1));
                     Player* p = new Player((int)assignedPlayerId,
-                                           "Player" + std::to_string(assignedPlayerId + 1),
+                                           pName,
                                            sx,
                                            sy,
                                            orient);

@@ -95,12 +95,18 @@ public:
             }
 
             // Boundary checks
-            if (p->m_position.x < 0) p->m_position.x = 0;
-            if (p->m_position.x > 1280) p->m_position.x = 1280;
+            if (p->m_position.x < 0) {
+                 p->m_position.x = 0;
+                 p->m_velocity.vx = 0;
+            }
+            if (p->m_position.x > 1248) { // 1280 - 32 (player width)
+                 p->m_position.x = 1248;
+                 p->m_velocity.vx = 0;
+            }
             
             // Hard floor safety net (below screen)
             if (p->m_position.y > 720) { 
-                p->m_position.y = 0; // Respawn at top if they fall out of world
+                p->takeDamage(1000); // Instant death
             }
         }
 
