@@ -59,12 +59,12 @@ bool SceneRegister::onEnter() {
     SDL_Renderer* renderer = Game::getInstance()->getRenderer();
     
     // 1. Resources
-    m_bannerTextureID = "Mario"; 
+    m_bannerTextureID = "Gummy_logo"; 
     // Assuming Mario is already loaded or we load it again (TextureManager handles duplicates if implemented well, 
     // but here we just call load. If it's already there, it might reload or just work. 
     // TextureManager::load doesn't check existence, it overwrites. 
     // Ideally we check, but for now let's just load to be safe or assume SceneLogin loaded it.)
-        if (!TextureManager::getInstance()->load(TextureManager::spritePath("Mario.png"), m_bannerTextureID, renderer)) {
+        if (!TextureManager::getInstance()->load("assets/gummy_logo.png", m_bannerTextureID, Game::getInstance()->getRenderer())) {
         std::cout << "[SceneRegister] Failed to load banner!" << std::endl;
     }
     
@@ -149,11 +149,11 @@ bool SceneRegister::onEnter() {
             m_lblError->setText(result);
             m_lblError->setColor({255, 0, 0, 255});
         }
-    }, srcBtnW, srcBtnH);
+    }, srcBtnW, srcBtnH, SDL_Color{0, 0, 0, 255});
     m_uiObjects.push_back(btnRegister);
 
     // Register Text on Button
-    Text* lblRegBtn = new Text(btnX + 25, btnY + 12, "assets/font.ttf", 18, "Register", {255, 255, 255, 255});
+    Text* lblRegBtn = new Text(btnX + 25, btnY + 12, "assets/font.ttf", 18, "Register", {0, 0, 0, 255});
     btnRegister->centerObject(lblRegBtn);
     m_uiObjects.push_back(lblRegBtn);
 
@@ -177,7 +177,7 @@ void SceneRegister::update() {
 
 void SceneRegister::render() {
     // Right side banner
-    TextureManager::getInstance()->drawStatic(
+    TextureManager::getInstance()->drawScaled(
         m_bannerTextureID,
         640, 0,         
         640, 720,      
