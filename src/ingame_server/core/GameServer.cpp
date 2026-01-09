@@ -11,12 +11,36 @@
 #include <iomanip>
 #include <sstream>
 #include <thread>
+#include <filesystem>
+#include <random>
 
 namespace {
 constexpr const char* kDefaultMap = "assets/maps/flatmap.txt";
 constexpr uint32_t kPauseDurationMs = 30000;
 constexpr uint32_t kPauseResumeCountdownMs = 3000;
 constexpr uint32_t kDrawOfferTimeoutMs = 10000;
+
+std::string GetRandomMapFromAssets() {
+    namespace fs = std::filesystem;
+    std::vector<std::string> maps;
+    const std::string mapsDir = "assets/maps";
+    try {
+        if (fs::exists(mapsDir) && fs::is_directory(mapsDir)) {
+            for (const auto& entry : fs::directory_iterator(mapsDir)) {
+                 if (entry.path().extension() == ".txt") {
+                     maps.push_back(entry.path().string());
+                 }
+            }
+        }
+    } catch (...) {}
+    
+    if (maps.empty()) return kDefaultMap;
+    
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, maps.size() - 1);
+    return maps[dis(gen)];
+}
 
 const char* CommandToString(uint32_t command) {
     switch (command) {
@@ -413,7 +437,14 @@ void GameServer::HandleClient(TCPSocket* clientSocket) {
 
                     if (!m_mapLoader) {
                         m_mapLoader = new MapLoader();
-                        std::string mapPath = (req.mapName[0] != '\0') ? std::string(req.mapName) : std::string(kDefaultMap);
+                        std::string reqMapName = (req.mapName[0] != '\0') ? std::string(req.mapName) : std::string(kDefaultMap);
+                        std::string mapPath = reqMapName;
+
+                        if (reqMapName == "RANDOM") {
+                            mapPath = GetRandomMapFromAssets();
+                            std::cout << "GameServer: Match " << m_matchId << " selected random map: " << mapPath << std::endl;
+                        }
+
                         if (!m_mapLoader->loadMap(mapPath)) {
                             res.isSuccess = false;
                             std::snprintf(res.message, sizeof(res.message), "Failed to load map: %s", mapPath.c_str());
@@ -482,8 +513,10 @@ void GameServer::HandleClient(TCPSocket* clientSocket) {
 
                 res.isSuccess = (assignedPlayerId != UINT32_MAX);
                 res.playerId = assignedPlayerId;
+                std::memset(res.mapPath, 0, sizeof(res.mapPath));
                 if (res.isSuccess) {
                     std::snprintf(res.message, sizeof(res.message), "Joined match %u as player %u", res.matchId, res.playerId);
+                    std::snprintf(res.mapPath, sizeof(res.mapPath), "%s", m_currentMapPath.c_str());
                 }
                 PacketUtils::SendPacket(clientSocket, PacketType::RES_INGAME_JOIN, res);
             } break;
@@ -1110,6 +1143,7 @@ void GameServer::BroadcastStateSnapshot() {
                 snapshot.players[i].y = pos.y;
                 snapshot.players[i].angle = p->m_angle;
                 snapshot.players[i].power = p->m_power;
+                snapshot.players[i].stamina = p->getStamina();
             }
         } else {
             snapshot.roomState = (uint32_t)m_gameRoom->getState();
@@ -1149,6 +1183,7 @@ void GameServer::BroadcastStateSnapshot() {
                 snapshot.players[i].y = pos.y;
                 snapshot.players[i].angle = p->m_angle;
                 snapshot.players[i].power = p->m_power;
+                snapshot.players[i].stamina = p->getStamina();
             }
 
             const auto& projectiles = m_gameRoom->getProjectiles();

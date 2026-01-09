@@ -20,6 +20,9 @@ public:
     Velocity m_velocity;
     float m_angle;
     float m_power;
+    float m_stamina; // Movement limit per turn
+    const float MAX_STAMINA = 400.0f; // Allow 400 pixels of movement
+
 private:
     int m_id;
     std::string m_name;
@@ -29,7 +32,7 @@ private:
 
 public:
     Player(int id, std::string name, float startX, float startY, bool startOrient)
-        : m_id(id), m_name(name), m_hp(100), m_isAlive(true), m_isMyTurn(false) {
+        : m_id(id), m_name(name), m_hp(100), m_isAlive(true), m_isMyTurn(false), m_stamina(MAX_STAMINA) {
             m_position = {startX, startY, startOrient};
             m_velocity = {0.0f, 0.0f};
             m_angle = 45.0f;
@@ -45,8 +48,12 @@ public:
     void setVelocity(Velocity vel) { m_velocity = vel; }
     void setOrient(bool orient) {m_position.orient = orient; }
 
-    void moveLeft() { m_velocity.vx = -SPEED; }
-    void moveRight() { m_velocity.vx = SPEED; }
+    void moveLeft() { 
+        if (m_stamina > 0.0f) m_velocity.vx = -SPEED; 
+    }
+    void moveRight() { 
+        if (m_stamina > 0.0f) m_velocity.vx = SPEED; 
+    }
     void stopMoving() { m_velocity.vx = 0.0f; }
     
     void adjustAngle(float delta) { m_angle += delta; }
@@ -60,6 +67,17 @@ public:
         }
     }
     
-    void setTurn(bool isMyTurn) { m_isMyTurn = isMyTurn; }
+    void setTurn(bool isMyTurn) { 
+        m_isMyTurn = isMyTurn; 
+        if (isMyTurn) m_stamina = MAX_STAMINA;
+    }
     bool isMyTurn() const { return m_isMyTurn; }
+    
+    // Called by PhysicsEngine to deduct stamina
+    void consumeStamina(float amount) {
+        m_stamina -= amount;
+        if (m_stamina < 0.0f) m_stamina = 0.0f;
+    }
+    
+    float getStamina() const { return m_stamina; }
 };

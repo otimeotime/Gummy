@@ -68,8 +68,25 @@ public:
             // Apply gravity
             p->m_velocity.vy += GRAVITY * simDt;
 
-            // Apply velocity
-            p->m_position.x += p->m_velocity.vx * simDt;
+            // Apply velocity with stamina limit
+            float moveX = p->m_velocity.vx * simDt;
+            
+            // Only consume stamina if moving horizontally and it is the current player's turn
+            // (Simulate "Walking" cost)
+            if (p->isMyTurn() && std::abs(p->m_velocity.vx) > 0.01f) {
+                float dist = std::abs(moveX);
+                if (p->getStamina() < dist) {
+                    // Allow partial movement for the remainder
+                    float ratio = (dist > 0.0001f) ? (p->getStamina() / dist) : 0.0f;
+                    moveX *= ratio; 
+                    p->consumeStamina(p->getStamina()); // All gone
+                    p->m_velocity.vx = 0.0f; // Force stop
+                } else {
+                    p->consumeStamina(dist);
+                }
+            }
+
+            p->m_position.x += moveX;
             p->m_position.y += p->m_velocity.vy * simDt;
 
             // --- NEW: PIXEL-PERFECT COLLISION ---

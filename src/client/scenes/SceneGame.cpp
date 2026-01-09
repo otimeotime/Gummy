@@ -453,6 +453,24 @@ bool SceneGame::onEnter() {
 
         m_matchId = joined.matchId;
         m_playerId = joined.playerId;
+
+        // Check if server selected a different map (e.g. via RANDOM request)
+        if (joined.mapPath[0] != '\0') {
+            std::string sMapPath(joined.mapPath);
+            if (sMapPath != m_mapPath) {
+                std::cout << "SceneGame: Server enforced map: " << sMapPath << " (was " << m_mapPath << ")" << std::endl;
+                m_mapPath = sMapPath;
+                if (m_mapLoader) delete m_mapLoader;
+                m_mapLoader = new MapLoader();
+                if (!m_mapLoader->loadMap(m_mapPath)) {
+                    std::cerr << "SceneGame: failed to reload forced map: " << m_mapPath << std::endl;
+                } else {
+                    createMapTexture();
+                    m_mapModified = false;
+                }
+            }
+        }
+
         std::cout << "SceneGame: joined match " << m_matchId << " as player " << m_playerId << std::endl;
 
         if (m_playerId == UINT32_MAX) {
@@ -1840,6 +1858,29 @@ void SceneGame::renderHealthBar(const NetPlayerState& player, const std::string&
     SDL_Rect healthBox = {barX, barY, barWidth, barHeight};
     SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
     SDL_RenderDrawRect(renderer, &healthBox);
+
+    // Render Stamina Bar (only if it's their turn)
+    if (player.isMyTurn) {
+        const int stamBarH = 4;
+        const int stamBarY = barY - stamBarH - 2;
+        
+        const float maxStamina = 400.0f; // Must match server constant
+        float sRatio = player.stamina / maxStamina;
+        if (sRatio > 1.0f) sRatio = 1.0f;
+        if (sRatio < 0.0f) sRatio = 0.0f;
+
+        SDL_Rect sBg{barX, stamBarY, barWidth, stamBarH};
+        SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
+        SDL_RenderFillRect(renderer, &sBg);
+
+        int sW = (int)(sRatio * barWidth);
+        SDL_Rect sFill{barX, stamBarY, sW, stamBarH};
+        SDL_SetRenderDrawColor(renderer, 50, 200, 255, 255); // Cyan/Blue
+        SDL_RenderFillRect(renderer, &sFill);
+
+        SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+        SDL_RenderDrawRect(renderer, &sBg);
+    }
 
     // Numeric HP (centered over the health bar)
     int hpTextX = barX + barWidth / 2;

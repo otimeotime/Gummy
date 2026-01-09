@@ -158,9 +158,10 @@ void TerminalScene::update() {
     if (under->ConsumeRematchStart()) {
         const bool hasHome = (Game::getInstance()->getClientSocket() && Game::getInstance()->getClientSocket()->IsConnected());
         if (hasHome) {
-            Game::getInstance()->getStateMachine()->requestPopStatesAndPush(2, new SceneGame(m_serverIp, m_serverPort, m_mapPath, m_username));
+            // Request a RANDOM map for rematch
+            Game::getInstance()->getStateMachine()->requestPopStatesAndPush(2, new SceneGame(m_serverIp, m_serverPort, "RANDOM", m_username));
         } else {
-            Game::getInstance()->getStateMachine()->requestReplaceAll(new SceneGame(m_serverIp, m_serverPort, m_mapPath, m_username));
+            Game::getInstance()->getStateMachine()->requestReplaceAll(new SceneGame(m_serverIp, m_serverPort, "RANDOM", m_username));
         }
         return;
     }

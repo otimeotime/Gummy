@@ -191,6 +191,7 @@ typedef struct {
     uint32_t matchId;
     uint32_t playerId;
     char message[100];
+    char mapPath[128];
 } ResIngameJoin;
 
 typedef struct {
@@ -212,6 +213,7 @@ typedef struct {
     float y;
     float angle;
     float power;
+    float stamina; // [0..MAX_STAMINA]
 } NetPlayerState;
 
 typedef struct {
