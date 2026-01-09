@@ -57,6 +57,7 @@ private:
     std::mutex m_clientsMutex;
     std::vector<TCPSocket*> m_clients;
     std::unordered_map<int, uint32_t> m_fdToPlayerId;
+    std::unordered_map<int, std::string> m_fdToName;
 
     // Pause state (authoritative)
     std::mutex m_pauseMutex;

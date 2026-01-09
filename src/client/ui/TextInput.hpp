@@ -18,6 +18,13 @@ public:
 
     // Get string from user
     std::string getString() const { return m_rawString; }
+    void setString(const std::string& s) { 
+        m_rawString = s; 
+        if (m_textComponent) m_textComponent->setText(s);
+    }
+
+    void setFocus(bool focus);
+    bool hasFocus() const { return m_hasFocus; }
 
 private:
     Text* m_textComponent; // Component

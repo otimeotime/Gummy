@@ -48,7 +48,9 @@ enum PacketType {
     // In-game pause (authoritative ingame server)
     REQ_INGAME_PAUSE_REQUEST,
     RES_INGAME_PAUSE_RESULT,
-    RES_INGAME_PAUSE_SIGNAL,
+    // In-game Chat
+    REQ_INGAME_CHAT,
+    RES_INGAME_CHAT,    RES_INGAME_PAUSE_SIGNAL,
     REQ_INGAME_PAUSE_END_EARLY,
     RES_INGAME_PAUSE_END,
 

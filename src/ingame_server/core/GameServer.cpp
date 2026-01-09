@@ -344,6 +344,7 @@ void GameServer::HandleClient(TCPSocket* clientSocket) {
         switch (packet.header.type) {
             case PacketType::REQ_INGAME_JOIN: {
                 ReqIngameJoin req = packet.GetPayload<ReqIngameJoin>();
+                req.username[31] = '\0'; // Safety
 
                 ResIngameJoin res{};
                 // If the service server assigned a match id, adopt it for snapshots/replays.
@@ -353,6 +354,12 @@ void GameServer::HandleClient(TCPSocket* clientSocket) {
                 }
                 res.matchId = (req.matchId == 0) ? m_matchId : req.matchId;
                 res.playerId = UINT32_MAX;
+
+                // Save username mapping
+                {
+                    std::lock_guard<std::mutex> lock(m_clientsMutex);
+                    m_fdToName[clientSocket->GetFd()] = req.username;
+                }
 
                 bool handledReplayJoin = false;
                 ResReplayInfo replayInfo{};
@@ -496,6 +503,38 @@ void GameServer::HandleClient(TCPSocket* clientSocket) {
                 std::lock_guard<std::mutex> lock(m_roomMutex);
                 if (!m_gameRoom) break;
                 m_gameRoom->handleInput((int)req.playerId, cmd, req.value);
+            } break;
+
+            case PacketType::REQ_INGAME_CHAT: {
+                if (m_isReplayMode.load()) break;
+
+                uint32_t senderId = UINT32_MAX;
+                std::string senderName = "Unknown";
+                {
+                    std::lock_guard<std::mutex> lock(m_clientsMutex);
+                    auto it = m_fdToPlayerId.find(clientSocket->GetFd());
+                    if (it != m_fdToPlayerId.end()) senderId = it->second;
+                    
+                    auto itName = m_fdToName.find(clientSocket->GetFd());
+                    if (itName != m_fdToName.end()) senderName = itName->second;
+                }
+
+                ReqIngameChat req = packet.GetPayload<ReqIngameChat>();
+                req.message[127] = '\0'; // Safety
+
+                ResIngameChat res{};
+                res.senderPlayerId = senderId;
+                res.isSystem = 0;
+                std::snprintf(res.senderName, sizeof(res.senderName), "%s", senderName.c_str());
+                std::snprintf(res.message, sizeof(res.message), "%s", req.message);
+
+                // Broadcast to all clients in this server
+                {
+                    std::lock_guard<std::mutex> lock(m_clientsMutex);
+                    for (auto* c : m_clients) {
+                        if (c) PacketUtils::SendPacket(c, PacketType::RES_INGAME_CHAT, res);
+                    }
+                }
             } break;
 
             case PacketType::REQ_INGAME_PAUSE_REQUEST: {

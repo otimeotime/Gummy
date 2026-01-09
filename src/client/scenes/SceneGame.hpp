@@ -188,6 +188,21 @@ private:
 
     Text* m_lblSurrenderStatus = nullptr;
 
+    // Chat UI
+    void EnsureChatUI();
+    void DestroyChatUI();
+    bool HandleChatInput();
+    void UpdateChatDisplay();
+
+    std::mutex m_chatMutex;
+    TextInput* m_inChat = nullptr;
+    std::vector<std::string> m_chatLog;
+    std::vector<Text*> m_chatTexts;
+    bool m_chatLogUpdated = false;
+    
+    bool m_prevEnter = false;
+    bool m_prevSpace = false;
+
     Button* m_btnPowerUp = nullptr;
     std::string m_powerUpIconID;
     bool m_powerUpArmed = false;

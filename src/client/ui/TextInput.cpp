@@ -28,6 +28,17 @@ void TextInput::clean() {
     }
 }
 
+void TextInput::setFocus(bool focus) {
+    m_hasFocus = focus;
+    if (m_hasFocus) {
+        m_boxColor = {230, 240, 255, 255}; // Light Blue when focused
+        m_borderColor = {0, 0, 255, 255};  // Blue Border
+    } else {
+        m_boxColor = {255, 255, 255, 255}; // White
+        m_borderColor = {0, 0, 0, 255};    // Black
+    }
+}
+
 void TextInput::update() {
     InputHandler* input = InputHandler::getInstance();
     Vector2D* mousePos = input->getMousePosition();

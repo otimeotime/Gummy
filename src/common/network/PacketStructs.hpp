@@ -182,6 +182,7 @@ typedef enum {
 typedef struct {
     uint32_t matchId;
     uint32_t userId;
+    char username[32];
     char mapName[64]; // optional; empty = default map
 } ReqIngameJoin;
 
@@ -327,6 +328,19 @@ typedef struct {
     uint8_t isSuccess;
     char message[100];
 } ResIngameSurrenderResult;
+
+// In-game Chat Packet ---------------------------
+typedef struct {
+    uint32_t matchId;
+    char message[128];
+} ReqIngameChat;
+
+typedef struct {
+    uint32_t senderPlayerId;
+    char senderName[32];
+    char message[128];
+    uint8_t isSystem; // 0=player, 1=system info
+} ResIngameChat;
 
 // Replay control packets -------------------------
 // These are only meaningful when the ingame server is started in replay mode.

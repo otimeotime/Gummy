@@ -395,9 +395,10 @@ bool SceneGame::onEnter() {
     if (!TextureManager::getInstance()->load("assets/power_up.png", m_powerUpIconID, Game::getInstance()->getRenderer())) {
         std::cerr << "SceneGame: failed to load power-up icon" << std::endl;
     }
-    if (!TextureManager::getInstance()->load("assets/gameplay_background.png", m_bgTextureID, Game::getInstance()->getRenderer())) {
+    if (!TextureManager::getInstance()->load("assets/sprites/gameplay_background.png", m_bgTextureID, Game::getInstance()->getRenderer())) {
         std::cerr << "SceneGame: failed to load background" << std::endl;
-        return false;
+        // Use fallback if needed, or allow continuing to try connecting
+        // return false; 
     }
     if (!TextureManager::getInstance()->load(TextureManager::spritePath("player.png"), m_playerID, Game::getInstance()->getRenderer())) {
         std::cerr << "SceneGame: failed to load player texture" << std::endl;
@@ -430,6 +431,7 @@ bool SceneGame::onEnter() {
         ReqIngameJoin join{};
         join.matchId = m_matchId;
         join.userId = m_userId;
+        std::snprintf(join.username, sizeof(join.username), "%s", m_username.c_str());
         std::snprintf(join.mapName, sizeof(join.mapName), "%s", m_mapPath.c_str());
 
         if (!PacketUtils::SendPacket(m_socket, PacketType::REQ_INGAME_JOIN, join)) {
@@ -467,6 +469,8 @@ bool SceneGame::onEnter() {
         } else {
             EnsurePauseUI();
         }
+
+        EnsureChatUI(); // Everyone gets chat
 
         m_running = true;
         m_receiverThread = std::thread(&SceneGame::ReceiverLoop, this);
@@ -513,6 +517,7 @@ bool SceneGame::onExit() {
     DestroyPauseUI();
     DestroyDrawUI();
     DestroySurrenderUI();
+    DestroyChatUI();
 
     if (m_btnPowerUp) { m_btnPowerUp->clean(); delete m_btnPowerUp; m_btnPowerUp = nullptr; }
 
@@ -619,27 +624,72 @@ void SceneGame::ReceiverLoop() {
                 if (m_playerId != UINT32_MAX && sig.requesterPlayerId == m_playerId) {
                     m_pauseRemainingUses = sig.requesterRemainingUses;
                 }
-                if (wasPaused && sig.durationMs <= 3000) {
-                    m_pauseToastText = "Resuming...";
-                    m_pauseToastUntilTick = SDL_GetTicks() + 1500;
+                
+                std::string name = "Unknown";
+                {
+                    std::lock_guard<std::mutex> stateLock(m_stateMutex);
+                    if (m_hasState) {
+                         for(int i=0; i<m_lastState.playerCount; ++i) {
+                             if(m_lastState.players[i].id == sig.requesterPlayerId) {
+                                 name = m_lastState.players[i].name;
+                                 break;
+                             }
+                         }
+                    }
+                }
+                if (name.empty()) name = "Player " + std::to_string(sig.requesterPlayerId);
+
+                std::string msg;
+                // If duration is short (less than 5s), it's a resume countdown.
+                if (sig.durationMs <= 5000) {
+                   msg = "[System] " + name + " unpaused. Resuming in " + std::to_string(sig.durationMs/1000) + "s...";
                 } else {
-                    m_pauseToastText = "Paused";
-                    m_pauseToastUntilTick = SDL_GetTicks() + 1500;
+                   msg = "[System] " + name + " paused the game.";
+                }
+                
+                {
+                    std::lock_guard<std::mutex> chatLock(m_chatMutex);
+                    m_chatLog.push_back(msg);
+                    if (m_chatLog.size() > 8) m_chatLog.erase(m_chatLog.begin());
+                    m_chatLogUpdated = true;
                 }
             }
             continue;
         }
         if (p.header.type == PacketType::RES_INGAME_PAUSE_END) {
-            ResIngamePauseEnd msg = p.GetPayload<ResIngamePauseEnd>();
-            (void)msg;
+            ResIngamePauseEnd msgEnd = p.GetPayload<ResIngamePauseEnd>();
             {
                 std::lock_guard<std::mutex> lock(m_pauseMutex);
                 m_pauseActive = false;
                 m_pauseRequesterId = UINT32_MAX;
                 m_pauseEndTick = 0;
                 m_pauseLastShownSeconds = -1;
-                m_pauseToastText = "Pause ended";
-                m_pauseToastUntilTick = SDL_GetTicks() + 2000;
+                
+                std::string name = "";
+                if (msgEnd.endedByPlayerId != UINT32_MAX) {
+                    {
+                        std::lock_guard<std::mutex> stateLock(m_stateMutex);
+                        if (m_hasState) {
+                            for(int i=0; i<m_lastState.playerCount; ++i) {
+                                if(m_lastState.players[i].id == msgEnd.endedByPlayerId) {
+                                    name = m_lastState.players[i].name;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (name.empty()) name = "Player " + std::to_string(msgEnd.endedByPlayerId);
+                } else {
+                    name = "System";
+                }
+
+                std::string msg = "[System]: " + name + " resumed the game.";
+                {
+                    std::lock_guard<std::mutex> chatLock(m_chatMutex);
+                    m_chatLog.push_back(msg);
+                    if (m_chatLog.size() > 8) m_chatLog.erase(m_chatLog.begin());
+                    m_chatLogUpdated = true;
+                }
             }
             continue;
         }
@@ -648,8 +698,18 @@ void SceneGame::ReceiverLoop() {
             {
                 std::lock_guard<std::mutex> lock(m_pauseMutex);
                 m_pauseRemainingUses = res.remainingUses;
-                m_pauseToastText = (res.message[0] != '\0') ? std::string(res.message) : (res.isSuccess ? "OK" : "Denied");
-                m_pauseToastUntilTick = SDL_GetTicks() + 2500;
+                
+                // This payload doesn't have ID, it is unicast to requester only.
+                // We use "You" or generic message.
+                std::string txt = (res.isSuccess) ? "Pause request accepted." : "Pause request denied.";
+                if (res.message[0] != '\0') txt += std::string(" (") + res.message + ")";
+
+                {
+                    std::lock_guard<std::mutex> chatLock(m_chatMutex);
+                    m_chatLog.push_back("[System]: " + txt);
+                    if (m_chatLog.size() > 8) m_chatLog.erase(m_chatLog.begin());
+                    m_chatLogUpdated = true;
+                }
             }
             continue;
         }
@@ -661,6 +721,29 @@ void SceneGame::ReceiverLoop() {
                 m_drawPending = true;
                 m_drawRequesterId = sig.requesterPlayerId;
                 m_drawExpireTick = SDL_GetTicks() + (Uint32)sig.durationMs;
+
+                std::string name = "Unknown";
+                {
+                    std::lock_guard<std::mutex> stateLock(m_stateMutex);
+                    if (m_hasState) {
+                         for(int i=0; i<m_lastState.playerCount; ++i) {
+                             if(m_lastState.players[i].id == sig.requesterPlayerId) {
+                                 name = m_lastState.players[i].name;
+                                 break;
+                             }
+                         }
+                    }
+                }
+                if (name.empty()) name = "Player " + std::to_string(sig.requesterPlayerId);
+
+                std::string msg = "[System]: " + name + " requested a draw.";
+
+                {
+                    std::lock_guard<std::mutex> chatLock(m_chatMutex);
+                    m_chatLog.push_back(msg);
+                    if (m_chatLog.size() > 8) m_chatLog.erase(m_chatLog.begin());
+                    m_chatLogUpdated = true;
+                }
             }
             continue;
         }
@@ -672,8 +755,37 @@ void SceneGame::ReceiverLoop() {
                 m_drawPending = false;
                 m_drawRequesterId = UINT32_MAX;
                 m_drawExpireTick = 0;
-                m_drawToastText = (res.message[0] != '\0') ? std::string(res.message) : std::string("Draw updated");
-                m_drawToastUntilTick = SDL_GetTicks() + 2500;
+                
+                std::string msg;
+                if (res.result == 0) { // ACCEPTED
+                    msg = "[System]: Draw Accepted.";
+                } else if (res.result == 1) { // DECLINED
+                     std::string responder = "Unknown";
+                     if (res.responderPlayerId != UINT32_MAX) {
+                        std::lock_guard<std::mutex> stateLock(m_stateMutex);
+                        if (m_hasState) {
+                             for(int i=0; i<m_lastState.playerCount; ++i) {
+                                 if(m_lastState.players[i].id == res.responderPlayerId) {
+                                     responder = m_lastState.players[i].name;
+                                     break;
+                                 }
+                             }
+                        }
+                        if (responder.empty()) responder = "Player " + std::to_string(res.responderPlayerId);
+                     }
+                     msg = "[System]: " + responder + " declined the draw.";
+                } else if (res.result == 2) { // TIMEOUT
+                     msg = "[System]: Draw request timed out.";
+                } else {
+                     msg = "[System]: Draw request denied.";
+                }
+
+                {
+                    std::lock_guard<std::mutex> chatLock(m_chatMutex);
+                    m_chatLog.push_back(msg);
+                    if (m_chatLog.size() > 8) m_chatLog.erase(m_chatLog.begin());
+                    m_chatLogUpdated = true;
+                }
             }
             continue;
         }
@@ -683,8 +795,32 @@ void SceneGame::ReceiverLoop() {
             {
                 std::lock_guard<std::mutex> lock(m_surrenderMutex);
                 m_surrenderConfirmActive = false;
-                m_surrenderToastText = (res.message[0] != '\0') ? std::string(res.message) : (res.isSuccess ? "Surrendered" : "Surrender denied");
-                m_surrenderToastUntilTick = SDL_GetTicks() + 2500;
+                
+                // This is unicast.
+                std::string txt = (res.isSuccess) ? "You surrendered." : "Surrender failed.";
+                if (res.message[0] != '\0') txt += " (" + std::string(res.message) + ")";
+                
+                {
+                    std::lock_guard<std::mutex> chatLock(m_chatMutex);
+                    m_chatLog.push_back("[System]: " + txt);
+                    if (m_chatLog.size() > 8) m_chatLog.erase(m_chatLog.begin());
+                    m_chatLogUpdated = true;
+                }
+            }
+            continue;
+        }
+
+        if (p.header.type == PacketType::RES_INGAME_CHAT) {
+            ResIngameChat c = p.GetPayload<ResIngameChat>();
+            std::string sender = (c.senderName[0] != '\0') ? c.senderName : "Player";
+            std::string msg = c.message;
+            std::string line = sender + ": " + msg;
+            
+            {
+                std::lock_guard<std::mutex> lock(m_chatMutex);
+                m_chatLog.push_back(line);
+                if (m_chatLog.size() > 8) m_chatLog.erase(m_chatLog.begin());
+                m_chatLogUpdated = true;
             }
             continue;
         }
@@ -771,6 +907,20 @@ void SceneGame::SendInput(uint32_t command, float value) {
 
 void SceneGame::update() {
     ApplyPendingReplayMap();
+
+    bool chatConsumed = HandleChatInput();
+    if (m_inChat) m_inChat->update();
+    UpdateChatDisplay();
+    
+    // Ensure we track key states even if chat blocks input, to avoid "stuck" keys or accidental triggers on release/focus loss.
+    const bool isSpacePressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_SPACE);
+    const bool isEnterPressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_RETURN);
+
+    if (chatConsumed || (m_inChat && m_inChat->hasFocus())) {
+        m_prevSpace = isSpacePressed;
+        m_prevEnter = isEnterPressed;
+        return; 
+    }
 
     if (InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_ESCAPE)) {
         Game::getInstance()->quit();
@@ -1092,25 +1242,21 @@ void SceneGame::update() {
     // - Press SPACE: reset power to 0, start charging.
     // - Hold SPACE: keep increasing power.
     // - Release SPACE: keep the last power value (no more updates).
-    static bool wasSpacePressed = false;
-    const bool isSpacePressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_SPACE);
-    if (isSpacePressed && !wasSpacePressed) {
+    if (isSpacePressed && !m_prevSpace) {
         // Reset power on a new charge attempt (server clamps to [0..100]).
         SendInput(INGAME_CMD_ADJUST_POWER, -1000.0f);
     }
     if (isSpacePressed) {
         SendInput(INGAME_CMD_ADJUST_POWER, 60.0f * dt);
     }
-    wasSpacePressed = isSpacePressed;
+    m_prevSpace = isSpacePressed;
 
-    static bool wasEnterPressed = false;
-    const bool isEnterPressed = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_RETURN);
-    if (isEnterPressed && !wasEnterPressed) {
+    if (isEnterPressed && !m_prevEnter) {
         // Consume locally (server is authoritative, but this keeps the UI indicator correct).
         m_powerUpArmed = false;
         SendInput(INGAME_CMD_FIRE);
     }
-    wasEnterPressed = isEnterPressed;
+    m_prevEnter = isEnterPressed;
 }
 
 void SceneGame::render() {
@@ -1639,60 +1785,9 @@ void SceneGame::render() {
         }
     }
 
-    // Global notifications (top-right)
-    {
-        const int margin = 20;
-        const int gap = 8;
-        int nextY = margin;
-
-        auto drawToastTopRight = [&](Text* lbl, const std::string& msg, Uint32 untilTick) {
-            if (!lbl) return;
-            const Uint32 tnow = SDL_GetTicks();
-            if (!(untilTick > tnow) || msg.empty()) return;
-            lbl->setText(msg);
-            const int w = lbl->getWidth();
-            lbl->setPosition((float)(1280 - margin - w), (float)nextY);
-            lbl->draw();
-            nextY += lbl->getHeight() + gap;
-        };
-
-        // Pause toast/status
-        {
-            std::string msg;
-            Uint32 until = 0;
-            {
-                std::lock_guard<std::mutex> lock(m_pauseMutex);
-                msg = m_pauseToastText;
-                until = m_pauseToastUntilTick;
-            }
-            drawToastTopRight(m_lblPauseStatus, msg, until);
-        }
-
-        // Draw toast/status
-        {
-            std::string msg;
-            Uint32 until = 0;
-            {
-                std::lock_guard<std::mutex> lock(m_drawMutex);
-                msg = m_drawToastText;
-                until = m_drawToastUntilTick;
-            }
-            drawToastTopRight(m_lblDrawStatus, msg, until);
-        }
-
-        // Surrender toast/status
-        {
-            std::string msg;
-            Uint32 until = 0;
-            {
-                std::lock_guard<std::mutex> lock(m_surrenderMutex);
-                msg = m_surrenderToastText;
-                until = m_surrenderToastUntilTick;
-            }
-            drawToastTopRight(m_lblSurrenderStatus, msg, until);
-        }
-
-
+    if (m_inChat) m_inChat->draw();
+    for (auto* t : m_chatTexts) {
+        if (t) t->draw();
     }
 }
 
@@ -1808,6 +1903,95 @@ void SceneGame::renderHealthBar(const NetPlayerState& player, const std::string&
                 SDL_DestroyTexture(nameTexture);
             }
             SDL_FreeSurface(nameSurface);
+        }
+    }
+}
+
+void SceneGame::EnsureChatUI() {
+    if (m_inChat) return;
+    
+    // Bottom left
+    int y = 720 - 40 - 10;
+    m_inChat = new TextInput(20, (float)y, 400, 30, "assets/font.ttf", 18);
+    m_inChat->setFocus(false);
+}
+
+void SceneGame::DestroyChatUI() {
+    if (m_inChat) { m_inChat->clean(); delete m_inChat; m_inChat = nullptr; }
+    for (auto* t : m_chatTexts) {
+        if (t) { t->clean(); delete t; }
+    }
+    m_chatTexts.clear();
+}
+
+bool SceneGame::HandleChatInput() {
+    if (!m_inChat) return false;
+
+    // Toggle interaction handled by update
+
+    // Check click-to-focus logic (handled inside TextInput::update, but we can verify)
+    // If user clicked box, m_inChat->hasFocus() will be true.
+
+    static bool tabPressed = false;
+    bool isTabDown = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_TAB);
+    if (isTabDown && !tabPressed) {
+        // Toggle focus
+        m_inChat->setFocus(!m_inChat->hasFocus());
+        // If unfocussing, maybe clear partial text? Or keep it. Keep it.
+    }
+    tabPressed = isTabDown;
+
+    bool consumed = false;
+
+    static bool enterPressed = false;
+    bool isEnterDown = InputHandler::getInstance()->isKeyDown(SDL_SCANCODE_RETURN);
+
+    if (isEnterDown && !enterPressed) {
+        if (m_inChat->hasFocus()) {
+            // Send
+            std::string msg = m_inChat->getString();
+            if (!msg.empty()) {
+                if (m_socket && m_socket->IsValid()) {
+                    ReqIngameChat req{};
+                    req.matchId = m_matchId;
+                    std::snprintf(req.message, sizeof(req.message), "%s", msg.c_str());
+                    PacketUtils::SendPacket(m_socket, PacketType::REQ_INGAME_CHAT, req);
+                }
+                m_inChat->setString(""); 
+            }
+            m_inChat->setFocus(false);
+            consumed = true; // Block this Enter from firing gun
+        }
+    }
+    enterPressed = isEnterDown;
+
+    return consumed;
+}
+
+void SceneGame::UpdateChatDisplay() {
+    bool update = false;
+    std::vector<std::string> logCopy;
+    {
+        std::lock_guard<std::mutex> lock(m_chatMutex);
+        if (m_chatLogUpdated) {
+            logCopy = m_chatLog;
+            m_chatLogUpdated = false;
+            update = true;
+        }
+    }
+
+    if (update) {
+        for (auto* t : m_chatTexts) {
+            if (t) { t->clean(); delete t; }
+        }
+        m_chatTexts.clear();
+
+        int lineH = 22;
+        int startY = 720 - 40 - 20 - (int)(logCopy.size() * lineH);
+        for (const auto& line : logCopy) {
+            Text* t = new Text(20, (float)startY, "assets/font.ttf", 18, line, {255, 255, 255, 255});
+            m_chatTexts.push_back(t);
+            startY += lineH;
         }
     }
 }
